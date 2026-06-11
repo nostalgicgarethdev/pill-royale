@@ -3,7 +3,7 @@ services:
     name: pill-royale
     env: node
     plan: free
-    buildCommand: npm install
+    buildCommand: npm run install:all && npm run build:client
     startCommand: node server.js
     envVars:
       - key: CLUSTER
