@@ -1,0 +1,19 @@
+{
+  "name": "pill-royale",
+  "version": "1.0.0",
+  "description": "Last pill standing wins real SOL. Hex battle royale with automatic on-chain payouts.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "@solana/web3.js": "^1.95.3",
+    "bs58": "^6.0.0",
+    "express": "^4.19.2",
+    "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

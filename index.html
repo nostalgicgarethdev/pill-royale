@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PILL ROYALE — Last Pill Standing</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Space+Grotesk:wght@500;600&amp;display=swap');
+    
+    :root { --accent: #22ff88; }
+    
+    body { font-family: 'Inter', system_ui, sans-serif; }
+    
+    .font-display {
+      font-family: 'Space Grotesk', 'Inter', system_ui, sans-serif;
+      font-weight: 600;
+    }
+
+    .game-container {
+      box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.4);
+      border: 1px solid #1f2937;
+    }
+
+    .arena-bg {
+      background: 
+        radial-gradient(circle at 30% 20%, rgba(16, 185, 129, 0.06) 0%, transparent 50%),
+        radial-gradient(circle at 70% 80%, rgba(163, 163, 172, 0.05) 0%, transparent 50%);
+    }
+
+    canvas { image-rendering: crisp-edges; touch-action: none; }
+
+    .player-row { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+
+    .toast { animation: toast-pop 0.2s ease forwards, toast-fade 2.8s ease forwards; }
+
+    @keyframes toast-pop {
+      from { transform: translateY(10px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+  </style>
+</head>
+<body class="bg-zinc-950 text-zinc-200">
+  <div class="min-h-screen flex flex-col">
+    <!-- Top nav -->
+    <div class="border-b border-zinc-800 bg-zinc-950/80 backdrop-blur-lg sticky top-0 z-50">
+      <div class="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
+        <div class="flex items-center gap-x-3">
+          <div class="flex items-center gap-x-2">
+            <div class="w-9 h-9 rounded-2xl bg-emerald-500 flex items-center justify-center">
+              <span class="text-xl">💊</span>
+            </div>
+            <span class="font-display text-2xl font-semibold tracking-tighter">PILL ROYALE</span>
+          </div>
+          <div class="px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-zinc-900 border border-zinc-800 text-emerald-400">LIVE MAINNET</div>
+        </div>
+        
+        <div class="flex items-center gap-x-6 text-sm">
+          <div class="flex items-center gap-x-2">
+            <div class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
+            <span class="text-emerald-400 font-medium" id="live-players">142 playing</span>
+          </div>
+          <div class="hidden md:flex items-center gap-x-1.5 text-xs px-3 py-1 rounded-full bg-zinc-900 border border-zinc-800 cursor-pointer" id="volume-display" title="Click to simulate trading volume (grows prize)">
+            $482.9k
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex-1 flex items-center justify-center p-6">
+      <div class="w-full max-w-[860px]">
+        
+        <!-- SPLASH -->
+        <div id="splash-screen">
+          <div class="text-center mb-8">
+            <div class="inline-flex items-center gap-x-2 px-4 py-1 rounded-3xl bg-zinc-900 border border-zinc-800 mb-4">
+              <span class="text-emerald-400">●</span>
+              <span class="text-sm font-medium">Real SOL. Real rounds. Instant payouts.</span>
+            </div>
+            <h1 class="font-display text-6xl tracking-tighter font-semibold mb-3">Last pill standing<br>wins real SOL.</h1>
+            <p class="text-xl text-zinc-400 max-w-md mx-auto">Hex tiles crumble beneath you. Be the last one on solid ground. 0.1 SOL auto-sent to your wallet.</p>
+          </div>
+
+          <div class="max-w-md mx-auto bg-zinc-900 border border-zinc-800 rounded-3xl p-6">
+            <div class="space-y-4">
+              <div>
+                <label class="block text-xs font-medium text-zinc-400 mb-1.5">DISPLAY NAME</label>
+                <input id="player-name" type="text" value="AnonPill" 
+                       class="w-full bg-zinc-950 border border-zinc-800 focus:border-emerald-500/50 rounded-2xl px-4 py-3 text-lg outline-none">
+              </div>
+
+              <div>
+                <label class="block text-xs font-medium text-zinc-400 mb-1.5">SOLANA WALLET (receives payout automatically)</label>
+                <div class="flex gap-2">
+                  <button onclick="connectPhantom()" 
+                          class="flex-1 flex items-center justify-center gap-x-2 bg-zinc-950 hover:bg-zinc-800 border border-zinc-700 hover:border-zinc-600 rounded-2xl px-4 py-3 text-sm font-medium transition">
+                    Connect Phantom
+                  </button>
+                  <button onclick="useDemoWallet()" 
+                          class="px-4 py-3 text-xs border border-zinc-700 hover:bg-zinc-950 rounded-2xl transition">Demo</button>
+                </div>
+                <input id="player-wallet" type="text" placeholder="Enter address or connect" value=""
+                       class="mt-2 w-full bg-zinc-950 border border-zinc-800 focus:border-emerald-500/50 font-mono text-sm rounded-2xl px-4 py-2.5 outline-none">
+              </div>
+
+              <div class="pt-2">
+                <button onclick="joinGame()" 
+                        class="w-full bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 transition text-black font-semibold text-lg py-4 rounded-2xl">
+                  ENTER THE ARENA
+                </button>
+                <p class="text-center text-[10px] text-zinc-500 mt-3">0.1 SOL paid instantly from treasury • No claiming</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="max-w-md mx-auto mt-6 text-xs text-center">
+            <div id="treasury-live" class="mb-3 text-emerald-400 font-mono text-sm"></div>
+            <div onclick="document.getElementById('how-it-works').classList.toggle('hidden')" class="cursor-pointer text-zinc-400 hover:text-zinc-300">
+              How it works ↓
+            </div>
+            <div id="how-it-works" class="hidden mt-3 bg-zinc-900/60 border border-zinc-800 rounded-2xl p-4 text-xs text-left text-zinc-400">
+              <ul class="space-y-1 list-none">
+                <li>1. Connect with name + wallet. Multiple people can join the same live server.</li>
+                <li>2. Real players + bots drop into the hex arena together.</li>
+                <li>3. Step on tiles → they crack and fall. Last pill standing wins.</li>
+                <li>4. The server automatically sends real SOL straight to the winner's wallet. No claiming.</li>
+              </ul>
+              <div class="mt-2 pt-2 border-t border-zinc-800 text-[10px]">Real mainnet SOL. Treasury is a real wallet you control. Bot wins return the prize to the treasury.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- LOBBY -->
+        <div id="lobby-screen" class="hidden max-w-md mx-auto">
+          <div class="bg-zinc-900 border border-zinc-800 rounded-3xl p-6">
+            <div class="flex justify-between items-start mb-5">
+              <div>
+                <div class="font-display text-2xl tracking-tight">MATCHING</div>
+                <div class="text-emerald-400 text-sm">Round <span id="lobby-round">47</span> • <span id="lobby-prize">0.10 SOL</span></div>
+              </div>
+              <div class="text-right">
+                <div class="text-xs text-zinc-500">IN LOBBY</div>
+                <div class="font-mono text-2xl font-semibold tabular-nums" id="lobby-count">1/7</div>
+              </div>
+            </div>
+
+            <div class="mb-4">
+              <div class="text-xs font-medium text-zinc-400 mb-2 px-1">WAITING TO DROP</div>
+              <div id="lobby-players" class="space-y-1 text-sm"></div>
+            </div>
+
+            <div class="text-xs text-center text-zinc-500">Round starts automatically when players are ready.<br>Other real players will appear here.</div>
+          </div>
+        </div>
+
+        <!-- GAME -->
+        <div id="game-screen" class="hidden">
+          <div class="flex items-center justify-between mb-3 px-1">
+            <div class="flex items-center gap-x-3">
+              <div class="font-display text-xl tracking-tighter">ROUND <span id="round-num" class="font-mono text-emerald-400">47</span></div>
+              <div class="px-3 py-px rounded-full text-xs font-medium bg-zinc-900 border border-zinc-700 flex items-center gap-x-1.5">
+                <span>PRIZE</span> 
+                <span id="prize-amount" class="font-mono font-semibold text-emerald-400">0.10 SOL</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-x-2 text-sm">
+              <div class="bg-zinc-900 border border-zinc-800 rounded-2xl px-3 py-1 flex items-center gap-x-2">
+                <span class="text-xs text-zinc-400">REMAINING</span>
+                <span id="players-left" class="font-mono font-semibold text-lg leading-none pt-px">7</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="relative game-container rounded-3xl overflow-hidden bg-zinc-900 border border-zinc-700" style="max-width: 780px;">
+            <div class="arena-bg">
+              <canvas id="game-canvas" width="780" height="720" class="block w-full"></canvas>
+            </div>
+            <div class="absolute top-4 right-4 bg-black/70 backdrop-blur px-3 py-2 rounded-2xl text-xs border border-white/10 font-mono" id="game-timer">00:00</div>
+            <div class="absolute bottom-4 left-4 bg-black/70 backdrop-blur px-3 py-2 rounded-2xl text-xs border border-white/10">
+              <div class="text-[10px] text-emerald-400/80 mb-px">CONTROLS</div>
+              <div class="text-[10px] text-zinc-400 leading-tight">WASD / Arrows or click adjacent tiles<br>Keep moving — tiles fall under you.</div>
+            </div>
+          </div>
+
+          <div class="mt-4 bg-zinc-900 border border-zinc-800 rounded-2xl p-3">
+            <div class="text-xs font-medium text-zinc-400 px-2 mb-2">PILLS IN THE ARENA (real players + bots)</div>
+            <div id="ingame-players" class="grid grid-cols-2 sm:grid-cols-4 gap-1 text-xs"></div>
+          </div>
+        </div>
+
+        <!-- RESULT -->
+        <div id="result-screen" class="hidden max-w-md mx-auto">
+          <div class="bg-zinc-900 border border-zinc-800 rounded-3xl p-7 text-center">
+            <div id="result-emoji" class="text-6xl mb-2">💊</div>
+            <div id="result-title" class="font-display text-4xl tracking-tighter font-semibold mb-1"></div>
+            <div id="result-subtitle" class="text-zinc-400 mb-6"></div>
+
+            <div id="payout-box" class="hidden mx-auto bg-black border border-emerald-900/60 rounded-2xl p-5 mb-6 text-left">
+              <div class="uppercase text-emerald-400 text-xs tracking-[1px]">PAYOUT COMPLETE — AUTOMATIC</div>
+              <div class="font-mono text-3xl font-semibold text-emerald-400 mt-1 mb-1" id="payout-amount">0.10 SOL</div>
+              <div class="text-xs text-zinc-400">sent directly to</div>
+              <div class="font-mono text-sm text-emerald-300 mt-0.5 break-all" id="payout-address"></div>
+            </div>
+
+            <div class="flex gap-3">
+              <button onclick="playAgain()" class="flex-1 bg-white text-black font-semibold py-3.5 rounded-2xl active:bg-zinc-200 transition">PLAY AGAIN (JOIN NEXT)</button>
+              <button onclick="returnToMenu()" class="flex-1 border border-zinc-700 hover:bg-zinc-950 py-3.5 rounded-2xl transition">MAIN MENU</button>
+            </div>
+            <div id="share-row" class="hidden mt-4">
+              <button onclick="fakeShareWin()" class="text-xs text-emerald-400 hover:text-emerald-300">Share on X</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <div class="text-center pb-6 text-[10px] text-zinc-500">Treasury-funded • Server-authoritative • Instant on-chain payouts</div>
+  </div>
+
+  <script>
+    // ============== CLIENT (WS-driven, server does real payouts) ==============
+    let canvas, ctx;
+    let ws = null;
+    let connected = false;
+    let userName = 'AnonPill';
+    let userWallet = '';
+
+    let renderPlayers = [];
+    let renderTiles = new Map();
+    let renderPrize = 0.1;
+    let roundStartTs = 0;
+    let isPlaying = false;
+    let gameEnded = false;
+    let particles = [];
+
+    const HEX_SIZE = 36;
+    const GRID_RADIUS = 5;
+
+    function hexKey(q, r) { return `${q},${r}`; }
+    function hexToPixel(q, r) {
+      return { x: HEX_SIZE * (3/2 * q), y: HEX_SIZE * (Math.sqrt(3)/2 * q + Math.sqrt(3) * r) };
+    }
+    function pixelToHex(px, py) {
+      const q = (2/3 * px) / HEX_SIZE;
+      const r = (-1/3 * px + Math.sqrt(3)/3 * py) / HEX_SIZE;
+      let s = -q - r;
+      let rq = Math.round(q), rr = Math.round(r), rs = Math.round(s);
+      const qd = Math.abs(rq - q), rd = Math.abs(rr - r), sd = Math.abs(rs - s);
+      if (qd > rd && qd > sd) rq = -rr - rs; else if (rd > sd) rr = -rq - rs;
+      return { q: rq, r: rr };
+    }
+    function isValidHex(q, r) {
+      return Math.abs(q) <= GRID_RADIUS && Math.abs(r) <= GRID_RADIUS && Math.abs(q + r) <= GRID_RADIUS;
+    }
+    function getAllHexes() {
+      const hexes = [];
+      for (let q = -GRID_RADIUS; q <= GRID_RADIUS; q++) for (let r = -GRID_RADIUS; r <= GRID_RADIUS; r++) if (Math.abs(q + r) <= GRID_RADIUS) hexes.push({q, r});
+      return hexes;
+    }
+
+    function connectWebSocket() {
+      const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const host = location.host || 'localhost:3000';
+      ws = new WebSocket(`${protocol}//${host}`);
+
+      ws.onopen = () => { connected = true; updateConnectionStatus(true); };
+      ws.onmessage = (ev) => {
+        try { handleServerMessage(JSON.parse(ev.data)); } catch(e){}
+      };
+      ws.onclose = () => { connected = false; updateConnectionStatus(false); setTimeout(connectWebSocket, 1600); };
+      ws.onerror = () => updateConnectionStatus(false);
+    }
+
+    function updateConnectionStatus(ok) {
+      const el = document.getElementById('conn-status');
+      if (!el) return;
+      el.innerHTML = ok 
+        ? '<span class="text-emerald-400">●</span> <span class="text-emerald-400 text-xs">SERVER CONNECTED</span>'
+        : '<span class="text-amber-400">●</span> <span class="text-amber-400 text-xs">RECONNECTING...</span>';
+      el.className = ok 
+        ? 'px-3 py-1 rounded-2xl bg-emerald-950/60 border border-emerald-900 text-xs flex items-center gap-x-1.5 ml-3'
+        : 'px-3 py-1 rounded-2xl bg-amber-950/40 border border-amber-900 text-xs flex items-center gap-x-1.5 ml-3';
+    }
+
+    function handleServerMessage(msg) {
+      if (msg.type === 'connected') {
+        renderPrize = msg.prize || 0.1;
+        updatePrizeDisplay();
+      }
+      if (msg.type === 'lobby_update') {
+        const lobby = document.getElementById('lobby-screen');
+        if (!lobby.classList.contains('hidden')) renderLobby(msg);
+      }
+      if (msg.type === 'round_start') {
+        document.getElementById('splash-screen').classList.add('hidden');
+        document.getElementById('lobby-screen').classList.add('hidden');
+        document.getElementById('result-screen').classList.add('hidden');
+        document.getElementById('game-screen').classList.remove('hidden');
+
+        isPlaying = true; gameEnded = false; roundStartTs = Date.now(); particles = [];
+        renderPlayers = msg.players || [];
+        renderTiles = new Map();
+        document.getElementById('round-num').textContent = String(msg.roundId || 47).slice(-5);
+        renderPrize = msg.prize || 0.1;
+        updatePrizeDisplay();
+        updateIngamePlayerList();
+        showToast('Round started — keep moving!');
+      }
+      if (msg.type === 'state') {
+        if (!isPlaying) return;
+        renderPlayers = msg.players || [];
+        renderTiles = new Map();
+        (msg.tiles || []).forEach(t => renderTiles.set(hexKey(t.q, t.r), t));
+        renderPrize = msg.prize || renderPrize;
+        updatePrizeDisplay();
+        updateIngamePlayerList();
+      }
+      if (msg.type === 'round_end') {
+        isPlaying = false; gameEnded = true;
+        document.getElementById('game-screen').classList.add('hidden');
+        const result = document.getElementById('result-screen');
+        result.classList.remove('hidden');
+
+        const title = document.getElementById('result-title');
+        const subtitle = document.getElementById('result-subtitle');
+        const payoutBox = document.getElementById('payout-box');
+        const emoji = document.getElementById('result-emoji');
+
+        const iWon = msg.winner && msg.winner.wallet && userWallet && msg.winner.wallet === userWallet;
+
+        if (iWon && msg.payout && msg.payout.success) {
+          title.textContent = 'VICTORY';
+          title.className = 'font-display text-4xl tracking-tighter font-semibold mb-1 text-emerald-400';
+          subtitle.textContent = 'You are the last pill standing.';
+          emoji.textContent = '🏆';
+          payoutBox.classList.remove('hidden');
+          document.getElementById('payout-amount').textContent = (msg.payout.amount || renderPrize).toFixed(2) + ' SOL';
+          document.getElementById('payout-address').textContent = userWallet;
+
+          if (msg.payout && msg.payout.signature) {
+            const isMainnet = msg.cluster === 'mainnet-beta' || msg.cluster === 'mainnet';
+            const clusterParam = isMainnet ? '' : '?cluster=devnet';
+            const a = document.createElement('a');
+            a.href = `https://solscan.io/tx/${msg.payout.signature}${clusterParam}`;
+            a.target = '_blank';
+            a.className = 'block mt-2 text-emerald-400 text-xs underline';
+            a.textContent = msg.payout.toTreasury ? 'View return-to-treasury tx on Solscan →' : 'View payout on Solscan →';
+            payoutBox.appendChild(a);
+          }
+          document.getElementById('share-row').classList.remove('hidden');
+        } else {
+          title.textContent = (msg.winner && msg.winner.name) ? 'ROUND COMPLETE' : 'ELIMINATED';
+          title.className = 'font-display text-4xl tracking-tighter font-semibold mb-1';
+          subtitle.textContent = msg.winner ? `${msg.winner.name} won.` : 'No one survived.';
+          emoji.textContent = '💊';
+          payoutBox.classList.add('hidden');
+          document.getElementById('share-row').classList.add('hidden');
+        }
+      }
+      if (msg.type === 'prize_update') { renderPrize = msg.prize; updatePrizeDisplay(); }
+    }
+
+    function sendJoin() {
+      if (!ws || ws.readyState !== WebSocket.OPEN) { alert('Connecting to server... try again in a second'); return; }
+      userName = document.getElementById('player-name').value.trim() || 'AnonPill';
+      userWallet = document.getElementById('player-wallet').value.trim() || '';
+      if (!userWallet) {
+        userWallet = '5' + Array.from({length:43}, () => '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'[Math.floor(Math.random()*58)]).join('');
+        document.getElementById('player-wallet').value = userWallet;
+      }
+      ws.send(JSON.stringify({ type: 'join', name: userName, wallet: userWallet }));
+
+      document.getElementById('splash-screen').classList.add('hidden');
+      document.getElementById('lobby-screen').classList.remove('hidden');
+      document.getElementById('lobby-round').textContent = 30 + Math.floor(Math.random()*50);
+      document.getElementById('lobby-count').textContent = '1/7';
+      document.getElementById('lobby-players').innerHTML = `
+        <div class="flex items-center justify-between px-3 py-1.5 bg-zinc-950 rounded-2xl text-sm">
+          <div class="flex items-center gap-x-2"><div class="w-2 h-2 bg-emerald-400 rounded-full"></div><span>${userName}</span></div>
+          <span class="font-mono text-xs text-zinc-500">${userWallet.slice(0,4)}..${userWallet.slice(-4)}</span>
+        </div>`;
+    }
+
+    function renderLobby(data) {
+      const c = document.getElementById('lobby-players'); c.innerHTML = '';
+      (data.players || []).forEach(p => {
+        const d = document.createElement('div');
+        d.className = 'flex items-center justify-between px-3 py-1.5 bg-zinc-950 rounded-2xl text-sm';
+        d.innerHTML = `<div class="flex items-center gap-x-2"><div class="w-2 h-2 bg-emerald-400 rounded-full"></div><span>${p.name}</span></div><span class="font-mono text-xs text-zinc-500">${p.walletShort||''}</span>`;
+        c.appendChild(d);
+      });
+      document.getElementById('lobby-count').textContent = `${(data.players||[]).length}/${data.max||7}`;
+    }
+
+    function sendMove(val) {
+      if (!ws || ws.readyState !== WebSocket.OPEN || !isPlaying) return;
+      if (typeof val === 'number') ws.send(JSON.stringify({type:'move', dir: val}));
+      else if (val && val.q != null) ws.send(JSON.stringify({type:'move', q: val.q, r: val.r}));
+    }
+
+    function setupInput() {
+      canvas = document.getElementById('game-canvas');
+      ctx = canvas.getContext('2d', { alpha: true });
+
+      canvas.addEventListener('click', e => {
+        if (!isPlaying) return;
+        const rect = canvas.getBoundingClientRect();
+        const h = pixelToHex(e.clientX - rect.left - canvas.width/2, e.clientY - rect.top - canvas.height/2 - 10);
+        if (isValidHex(h.q, h.r)) sendMove(h);
+      });
+
+      window.addEventListener('keydown', e => {
+        if (!isPlaying) return;
+        let d = -1;
+        if (['w','arrowup'].includes(e.key.toLowerCase())) d=5;
+        else if (e.key.toLowerCase()==='e') d=0;
+        else if (['d','arrowright'].includes(e.key.toLowerCase())) d=1;
+        else if (['s','arrowdown'].includes(e.key.toLowerCase())) d=2;
+        else if (['a','arrowleft'].includes(e.key.toLowerCase())) d=4;
+        else if (e.key.toLowerCase()==='q') d=3;
+        if (d>=0) { e.preventDefault(); sendMove(d); }
+      });
+
+      let ts = null;
+      canvas.addEventListener('touchstart', e => { if (isPlaying) ts = {x:e.touches[0].clientX, y:e.touches[0].clientY}; }, {passive:true});
+      canvas.addEventListener('touchend', e => {
+        if (!isPlaying || !ts) return;
+        const rect = canvas.getBoundingClientRect();
+        const h = pixelToHex(e.changedTouches[0].clientX - rect.left - canvas.width/2, e.changedTouches[0].clientY - rect.top - canvas.height/2 - 10);
+        if (isValidHex(h.q, h.r)) sendMove(h);
+        ts = null;
+      });
+    }
+
+    function updatePrizeDisplay() {
+      const el = document.getElementById('prize-amount');
+      if (el) el.textContent = (renderPrize || 0.1).toFixed(2) + ' SOL';
+    }
+
+    function updateIngamePlayerList() {
+      const c = document.getElementById('ingame-players'); if (!c) return; c.innerHTML = '';
+      const live = renderPlayers.filter(p => !p.eliminated);
+      [...renderPlayers].sort((a,b) => (a.eliminated?1:0)-(b.eliminated?1:0)).forEach(p => {
+        const isMe = p.name === userName || (p.walletShort && userWallet && p.walletShort.includes(userWallet.slice(0,4)));
+        const d = document.createElement('div');
+        d.className = `player-row flex items-center gap-x-2 px-2.5 py-1.5 rounded-xl ${p.eliminated?'opacity-50 line-through':''} ${isMe?'bg-emerald-950/40':'bg-zinc-950'}`;
+        d.innerHTML = `<div class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background:${p.color||'#3f3f46'}"></div><div class="flex-1 min-w-0"><div class="font-medium text-xs truncate">${p.name}${isMe?' <span class="text-emerald-400">(you)</span>':''}</div></div><div class="font-mono text-[9px] text-zinc-500">${p.walletShort|| (p.isBot?'BOT':'')}</div>`;
+        c.appendChild(d);
+      });
+      const left = document.getElementById('players-left'); if (left) left.textContent = live.length;
+    }
+
+    function updateTimer() {
+      if (!isPlaying) return;
+      const s = Math.floor((Date.now()-roundStartTs)/1000);
+      const el = document.getElementById('game-timer');
+      if (el) el.textContent = `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+    }
+
+    function render() {
+      if (!canvas || !ctx) return;
+      ctx.save(); ctx.clearRect(0,0,canvas.width,canvas.height);
+      const cx = canvas.width/2, cy = canvas.height/2 + 10;
+
+      const g = ctx.createRadialGradient(cx, cy-40, 80, cx, cy, 360);
+      g.addColorStop(0,'rgba(16,185,129,0.035)'); g.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle = g; ctx.fillRect(0,0,canvas.width,canvas.height);
+
+      getAllHexes().forEach(h => {
+        const p = hexToPixel(h.q, h.r);
+        const t = renderTiles.get(hexKey(h.q,h.r)) || {durability:3, fallen:false, fallAt:null};
+        drawHex(ctx, cx + p.x, cy + p.y, t);
+      });
+
+      const myShort = userWallet ? userWallet.slice(0,4)+'..'+userWallet.slice(-4) : '';
+      [...renderPlayers].sort((a,b)=>(a.eliminated?1:0)-(b.eliminated?1:0)).forEach(p => {
+        const pos = hexToPixel(p.q, p.r);
+        const px = cx + pos.x, py = cy + pos.y;
+        const me = (p.walletShort && p.walletShort.includes(myShort)) || p.name === userName;
+        if (p.eliminated) drawPill(ctx, px, py+5, p.color||'#27272a', 0.58, me, true);
+        else {
+          drawPill(ctx, px, py, p.color||'#22ff88', 1, me, false);
+          ctx.font = '600 10px Inter, system-ui'; ctx.textAlign='center';
+          ctx.fillStyle = me ? '#22ff88' : '#a1a1aa'; ctx.fillText(p.name, px, py-26);
+          if (me) { ctx.font='500 8px Inter, system-ui'; ctx.fillStyle='#166534'; ctx.fillText('YOU', px, py-36); }
+        }
+      });
+
+      ctx.globalAlpha = 1;
+      particles.forEach((pt,i) => {
+        pt.x += pt.vx; pt.y += pt.vy; pt.vy += 0.048; pt.life -= 17;
+        if (pt.life <= 0) { particles.splice(i,1); return; }
+        ctx.globalAlpha = Math.max(0.07, pt.life/700);
+        ctx.fillStyle = pt.color; ctx.beginPath(); ctx.arc(cx+pt.x, cy+pt.y, pt.size, 0, Math.PI*2); ctx.fill();
+      });
+      ctx.globalAlpha = 1;
+
+      ctx.strokeStyle = 'rgba(163,163,172,0.12)'; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(cx, cy, 265, 0, Math.PI*2); ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawHex(ctx, cx, cy, tile) {
+      ctx.save();
+      const pts = [];
+      for (let i=0; i<6; i++) { const a = (Math.PI/3)*i - Math.PI/6; pts.push({x:cx+HEX_SIZE*Math.cos(a), y:cy+HEX_SIZE*Math.sin(a)}); }
+      ctx.beginPath(); ctx.moveTo(pts[0].x,pts[0].y); for(let i=1;i<6;i++) ctx.lineTo(pts[i].x,pts[i].y); ctx.closePath();
+      let f='#111217', s='#27272a';
+      if (tile.fallen) { f='#09090b'; s='#18181b'; }
+      else if (tile.fallAt) { const d = Math.max(0,1-(tile.fallAt-Date.now())/680); f=`hsl(25,65%,${18+d*12}%)`; s = d>0.6?'#b45309':'#3f3f46'; }
+      else if (tile.durability<=1){f='#1c1917';s='#57534e';} else if (tile.durability<=2){f='#171717';s='#3f3f46';}
+      ctx.fillStyle=f; ctx.fill(); ctx.strokeStyle=s; ctx.lineWidth = tile.fallen?1:1.75; ctx.stroke();
+
+      if (!tile.fallen && tile.durability < 3) {
+        ctx.strokeStyle = tile.durability<=1 ? '#f59e0b' : '#854d0e';
+        ctx.lineWidth = tile.durability<=1 ? 1.55 : 1.05; ctx.lineCap='round';
+        for (let c=0; c < (tile.durability<=1?3:2); c++) {
+          ctx.beginPath();
+          const a1=(c*1.8+0.6)%6, a2=(a1+1.7)%6;
+          ctx.moveTo(cx+(pts[a1|0].x-cx)*0.32, cy+(pts[a1|0].y-cy)*0.32);
+          ctx.lineTo(cx+(Math.random()-0.5)*HEX_SIZE*0.6, cy+(Math.random()-0.5)*HEX_SIZE*0.6);
+          ctx.lineTo(cx+(pts[a2|0].x-cx)*0.27, cy+(pts[a2|0].y-cy)*0.27);
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+    }
+
+    function drawPill(ctx, cx, cy, col, sc=1, human=false, dead=false) {
+      ctx.save();
+      const w=15*sc, h=9.5*sc;
+      ctx.fillStyle='rgba(0,0,0,0.55)'; ctx.beginPath(); ctx.ellipse(cx+1.5,cy+10*sc,w*0.9,3.5,0,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle = dead?'#27272a':col; ctx.strokeStyle=dead?'#18181b':(human?'#166534':'#111113'); ctx.lineWidth=human?2.5:1.8;
+      ctx.beginPath(); ctx.ellipse(cx,cy,w,h,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+      if (!dead) { ctx.fillStyle='rgba(255,255,255,0.45)'; ctx.beginPath(); ctx.ellipse(cx-w*0.28,cy-h*0.32,w*0.55,h*0.45,-0.6,0,Math.PI*2); ctx.fill(); }
+      ctx.strokeStyle=dead?'#18181b':'rgba(0,0,0,0.35)'; ctx.lineWidth=1.4; ctx.beginPath(); ctx.ellipse(cx,cy,w*0.94,h*0.78,0,0,Math.PI*2); ctx.stroke();
+      if (human && !dead) { ctx.strokeStyle='#22ff88'; ctx.lineWidth=1.6; ctx.beginPath(); ctx.ellipse(cx,cy,w+4.5,h+3,0,0,Math.PI*2); ctx.stroke(); }
+      ctx.restore();
+    }
+
+    function gameLoop() { render(); updateTimer(); requestAnimationFrame(gameLoop); }
+    function showToast(t) {
+      const c = document.getElementById('game-screen'); if (!c) return;
+      const el = document.createElement('div');
+      el.className='toast absolute bottom-20 left-1/2 -translate-x-1/2 bg-zinc-900/90 text-xs border border-zinc-700 px-4 py-1.5 rounded-2xl pointer-events-none';
+      el.textContent = t; c.appendChild(el); setTimeout(()=>el.remove(), 2400);
+    }
+
+    function joinGame() { sendJoin(); }
+    function playAgain() {
+      document.getElementById('result-screen').classList.add('hidden');
+      document.getElementById('lobby-screen').classList.remove('hidden');
+      if (ws && ws.readyState===1) ws.send(JSON.stringify({type:'join', name:userName, wallet:userWallet}));
+    }
+    function returnToMenu() {
+      document.getElementById('result-screen').classList.add('hidden');
+      document.getElementById('game-screen').classList.add('hidden');
+      document.getElementById('lobby-screen').classList.add('hidden');
+      document.getElementById('splash-screen').classList.remove('hidden');
+      isPlaying = false;
+    }
+    function fakeShareWin() {
+      window.open('https://x.com/intent/tweet?text=' + encodeURIComponent('I just won real SOL in PILL ROYALE 💊 last pill standing'), '_blank');
+    }
+    async function connectPhantom() {
+      const inp = document.getElementById('player-wallet');
+      if (window.solana?.isPhantom) {
+        const r = await window.solana.connect(); userWallet = r.publicKey.toString(); inp.value = userWallet;
+      } else alert('Phantom not found — paste address manually');
+    }
+    function useDemoWallet() {
+      const inp = document.getElementById('player-wallet');
+      inp.value = '5' + Array.from({length:43},()=> '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'[Math.floor(Math.random()*58)]).join('');
+      userWallet = inp.value;
+    }
+
+    function init() {
+      setupInput();
+      connectWebSocket();
+
+      document.getElementById('player-name').addEventListener('keydown', e => { if (e.key==='Enter') joinGame(); });
+      requestAnimationFrame(gameLoop);
+
+      const vol = document.getElementById('volume-display');
+      if (vol) vol.onclick = () => { if (ws && ws.readyState===1) ws.send(JSON.stringify({type:'bump_volume'})); };
+
+      // connection status pill
+      const hdr = document.querySelector('.sticky .flex.items-center.gap-x-6');
+      if (hdr) {
+        const s = document.createElement('div');
+        s.id='conn-status';
+        s.className='px-3 py-1 rounded-2xl bg-amber-950/40 border border-amber-900 text-xs flex items-center gap-x-1.5 ml-3';
+        s.innerHTML = '<span class="text-amber-400">●</span> <span class="text-amber-400 text-xs">CONNECTING...</span>';
+        hdr.prepend(s);
+      }
+
+      updatePrizeDisplay();
+
+      // Live treasury display on splash (makes it feel like a real deployed site)
+      fetch('/treasury')
+        .then(r => r.json())
+        .then(data => {
+          const el = document.getElementById('treasury-live');
+          if (el && data.address) {
+            const bal = data.balanceSOL != null ? data.balanceSOL.toFixed(2) : '?';
+            el.innerHTML = `Treasury: <span class="font-bold">${bal} SOL</span> • Next win pays <span class="font-bold">${data.prizeSOL || 0.1} SOL</span>`;
+          }
+        })
+        .catch(() => {});
+
+      console.log('%c[PILL ROYALE] WS client ready — real mainnet payouts when you win.', 'color:#22ff88');
+    }
+    window.onload = init;
+  </script>
+</body>
+</html>

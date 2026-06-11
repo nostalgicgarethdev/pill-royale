@@ -1,0 +1,22 @@
+# Never commit secret keys or funded treasuries
+treasury.json
+treasury*.json
+*.key
+*.secret
+.env
+.env.*
+!.env.example
+secrets/
+
+# Node
+node_modules/
+npm-debug.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Misc
+*.log
+dist/
+build/

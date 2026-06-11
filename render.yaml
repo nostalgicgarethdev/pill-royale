@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: pill-royale
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: CLUSTER
+        value: mainnet-beta
+      - key: PRIZE_SOL
+        value: "0.1"
+      # TREASURY_SECRET must be set manually in the Render dashboard (never commit it)
+      # - key: TREASURY_SECRET
+      #   sync: false
+    healthCheckPath: /treasury
+    autoDeploy: true
