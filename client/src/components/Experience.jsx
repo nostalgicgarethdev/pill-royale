@@ -24,28 +24,33 @@ export const Experience = ({ wallet, playerName }) => {
 
   return (
     <>
-      {/* No OrbitControls in game mode for immersive play */}
-      <Environment files={"hdrs/medieval_cafe_1k.hdr"} />
-      {stage === "winner" ? (
-        <Podium />
-      ) : (
-        <>
-          {stage !== "lobby" && <GameArena />}
-          {players.map(({ state, controls }) => (
-            <CharacterController
-              key={state.id}
-              state={state}
-              controls={controls}
-              player={me.id === state.id}
-              firstNonDeadPlayer={firstNonDeadPlayer?.state.id === state.id}
-              position-y={2}
-              // Pass wallet info for real player display / payout
-              wallet={wallet}
-              playerName={playerName}
-            />
-          ))}
-        </>
-      )}
+      {/* Dark background + simple ground for visibility */}
+      <color attach="background" args={["#041c0b"]} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position-y={-0.1}>
+        <planeGeometry args={[100, 100]} />
+        <meshLambertMaterial color="#0a2a12" />
+      </mesh>
+
+      {/* Always show the crumbling hex arena for the core experience */}
+      <GameArena />
+
+      {/* Players - the controller makes movement simple and easy */}
+      {players.map(({ state, controls }) => (
+        <CharacterController
+          key={state.id}
+          state={state}
+          controls={controls}
+          player={me.id === state.id}
+          firstNonDeadPlayer={firstNonDeadPlayer?.state.id === state.id}
+          position-y={2}
+          // Pass wallet info for real player display / payout
+          wallet={wallet}
+          playerName={playerName}
+        />
+      ))}
+
+      {/* Optional podium on win */}
+      {stage === "winner" && <Podium />}
     </>
   );
 };
