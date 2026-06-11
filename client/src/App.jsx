@@ -3,7 +3,51 @@ import { Physics } from "@react-three/rapier";
 import { Experience } from "./components/Experience";
 
 import { KeyboardControls } from "@react-three/drei";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, Component } from "react";
+
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error("3D Game ErrorBoundary caught:", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ 
+          position: 'absolute', inset: 0, 
+          display: 'flex', alignItems: 'center', justifyContent: 'center', 
+          background: '#041c0b', color: 'white', flexDirection: 'column', zIndex: 9999,
+          fontFamily: 'system-ui, sans-serif'
+        }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>💊</div>
+          <h2 style={{ margin: 0 }}>3D Scene Error</h2>
+          <p style={{ maxWidth: 400, textAlign: 'center', opacity: 0.8 }}>
+            The 3D game hit an error (probably during initial render or after entering). 
+            Try refreshing. The underlying game logic (wallet, payouts, real players) is still working.
+          </p>
+          <button 
+            onClick={() => window.location.reload()} 
+            style={{ marginTop: 20, padding: '8px 16px', background: '#22ff88', color: 'black', border: 'none', borderRadius: 8, cursor: 'pointer' }}
+          >
+            Reload Game
+          </button>
+          {this.state.error && (
+            <pre style={{ fontSize: 10, marginTop: 20, opacity: 0.6, maxWidth: '80%', overflow: 'auto' }}>
+              {this.state.error.toString()}
+            </pre>
+          )}
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 import { UI } from "./components/UI";
 import { AudioManagerProvider } from "./hooks/useAudioManager";
 import { GameStateProvider } from "./hooks/useGameState";
@@ -76,7 +120,8 @@ function App() {
     <KeyboardControls map={map}>
       <AudioManagerProvider>
         <GameStateProvider>
-          <div style={{ position: 'relative', width: '100vw', height: '100vh' }}>
+          <ErrorBoundary>
+          <div style={{ position: 'relative', width: '100vw', height: '100vh', background: '#041c0b' }}>
             <Canvas shadows camera={{ position: [0, 16, 10], fov: 42 }}>
               <color attach="background" args={["#041c0b"]} />
               <Physics>
@@ -135,6 +180,7 @@ function App() {
               </div>
             )}
           </div>
+          </ErrorBoundary>
         </GameStateProvider>
       </AudioManagerProvider>
     </KeyboardControls>
