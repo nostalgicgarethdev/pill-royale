@@ -58,7 +58,7 @@
         <div class="flex items-center gap-x-6 text-sm">
           <div class="flex items-center gap-x-2">
             <div class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
-            <span class="text-emerald-400 font-medium" id="live-players">142 playing</span>
+            <span class="text-emerald-400 font-medium" id="live-players">0 playing</span>
           </div>
           <div class="hidden md:flex items-center gap-x-1.5 text-xs px-3 py-1 rounded-full bg-zinc-900 border border-zinc-800 cursor-pointer" id="volume-display" title="Click to simulate trading volume (grows prize)">
             $482.9k
@@ -286,6 +286,12 @@
       if (msg.type === 'connected') {
         renderPrize = msg.prize || 0.1;
         updatePrizeDisplay();
+        const lp = document.getElementById('live-players');
+        if (lp && msg.playerCount != null) lp.textContent = msg.playerCount + ' playing';
+      }
+      if (msg.type === 'player_count') {
+        const lp = document.getElementById('live-players');
+        if (lp && msg.count != null) lp.textContent = msg.count + ' playing';
       }
       if (msg.type === 'lobby_update') {
         const lobby = document.getElementById('lobby-screen');

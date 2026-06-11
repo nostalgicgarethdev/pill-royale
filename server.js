@@ -571,6 +571,11 @@ function broadcastToLobby(type, payload) {
   }
 }
 
+function broadcastPlayerCount() {
+  const count = connectedClients.size;
+  broadcast('player_count', { count });
+}
+
 function getLobbyState() {
   return {
     players: lobby.map(p => ({ name: p.name, walletShort: p.wallet ? p.wallet.slice(0,4)+'..'+p.wallet.slice(-4) : '' })),
@@ -686,6 +691,7 @@ wss.on('connection', (ws) => {
   const clientId = 'c' + (clientIdCounter++);
   const client = { id: clientId, name: 'Anon', wallet: null, ws };
   connectedClients.set(ws, client);
+  broadcastPlayerCount();
 
   console.log(`[WS] Client connected: ${clientId}`);
 
@@ -695,7 +701,8 @@ wss.on('connection', (ws) => {
     clientId,
     treasury: treasuryKeypair ? treasuryKeypair.publicKey.toBase58() : null,
     prize: PRIZE_SOL,
-    cluster: CLUSTER
+    cluster: CLUSTER,
+    playerCount: connectedClients.size
   }));
 
   ws.on('message', async (raw) => {
@@ -753,6 +760,7 @@ wss.on('connection', (ws) => {
 
   ws.on('close', () => {
     connectedClients.delete(ws);
+    broadcastPlayerCount();
     // Remove from lobby
     lobby = lobby.filter(lp => lp.ws !== ws);
     broadcast('lobby_update', getLobbyState());
