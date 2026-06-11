@@ -1,4 +1,3 @@
-import { Environment } from "@react-three/drei";
 import { useThree } from "@react-three/fiber";
 import { myPlayer } from "playroomkit";
 import { useEffect } from "react";
@@ -14,7 +13,6 @@ export const Experience = ({ wallet, playerName }) => {
   const { players, stage } = useGameState();
   const me = myPlayer();
   const camera = useThree((state) => state.camera);
-  const firstNonDeadPlayer = players.find((p) => !p.state.getState("dead"));
 
   useEffect(() => {
     if (stage === "countdown") {
@@ -91,4 +89,4 @@ export const Experience = ({ wallet, playerName }) => {
     </>
   );
 };
-};
+
