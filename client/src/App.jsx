@@ -62,61 +62,56 @@ function App() {
             </Canvas>
             <UI wallet={wallet} playerName={playerName} />
             
-            {/* Clean, easy wallet entry - no black screen blocking the 3D start view */}
+            {/* Floating wallet entry - minimal overlay so you see the 3D arena immediately */}
             {!wallet && (
-              <div className="absolute inset-0 flex items-center justify-center z-50 pointer-events-auto bg-black/40">
-                <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-8 max-w-md w-full mx-4 text-white shadow-2xl">
-                  <div className="text-center mb-6">
-                    <div className="text-4xl mb-2">💊</div>
-                    <h1 className="text-3xl font-bold tracking-tight">PILL ROYALE</h1>
-                    <p className="text-emerald-400 mt-1">Real SOL • Mainnet • Only real players</p>
+              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[60] pointer-events-auto w-[94vw] max-w-[380px]">
+                <div className="bg-zinc-950/95 border border-zinc-700 rounded-3xl p-5 text-white shadow-xl">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="text-2xl">💊</div>
+                    <div>
+                      <div className="font-semibold text-lg leading-none">PILL ROYALE</div>
+                      <div className="text-emerald-400 text-xs">Real SOL • 3D • Real players only</div>
+                    </div>
                   </div>
 
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-zinc-400 mb-1">Display Name</label>
-                      <input 
-                        type="text" 
-                        id="player-name-input"
-                        defaultValue="PillPlayer"
-                        className="w-full bg-zinc-800 border border-zinc-700 focus:border-emerald-500 rounded-xl px-4 py-3 text-lg outline-none"
-                        placeholder="Your name"
-                      />
-                    </div>
+                  <div className="space-y-2.5">
+                    <input 
+                      type="text" 
+                      id="player-name-input"
+                      defaultValue="PillPlayer"
+                      placeholder="Your display name"
+                      className="w-full bg-zinc-900 border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-2 text-sm outline-none"
+                    />
 
-                    <div>
-                      <label className="block text-sm font-medium text-zinc-400 mb-1">Solana Wallet (for automatic payout)</label>
-                      <div className="flex gap-2">
-                        <button 
-                          onClick={() => {
-                            const nameInput = document.getElementById('player-name-input').value.trim() || 'PillPlayer';
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => {
+                          const nameInput = document.getElementById('player-name-input').value.trim() || 'PillPlayer';
+                          setPlayerName(nameInput);
+                          connectWallet(setWallet, nameInput);
+                        }}
+                        className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-black font-semibold py-2 rounded-2xl text-sm transition"
+                      >
+                        Connect Phantom
+                      </button>
+                      <button 
+                        onClick={() => {
+                          const nameInput = document.getElementById('player-name-input').value.trim() || 'PillPlayer';
+                          const addr = prompt('Paste Solana wallet for payout:');
+                          if (addr) {
+                            setWallet(addr);
                             setPlayerName(nameInput);
-                            connectWallet(setWallet, nameInput);
-                          }}
-                          className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-black font-semibold py-3 rounded-xl transition"
-                        >
-                          Connect Phantom
-                        </button>
-                        <button 
-                          onClick={() => {
-                            const nameInput = document.getElementById('player-name-input').value.trim() || 'PillPlayer';
-                            const addr = prompt('Paste your Solana wallet address for real SOL payouts:');
-                            if (addr) {
-                              setWallet(addr);
-                              setPlayerName(nameInput);
-                            }
-                          }}
-                          className="px-4 py-3 border border-zinc-700 hover:bg-zinc-800 rounded-xl text-sm"
-                        >
-                          Paste Address
-                        </button>
-                      </div>
-                      <p className="text-[10px] text-zinc-500 mt-1">Your wallet receives the prize automatically if you win. No gas fees to play.</p>
+                          }
+                        }}
+                        className="px-3 py-2 text-xs border border-zinc-700 hover:bg-zinc-900 rounded-2xl"
+                      >
+                        Paste Addr
+                      </button>
                     </div>
                   </div>
 
-                  <div className="mt-6 text-center text-xs text-zinc-500">
-                    3D hex crumbling arena • Last real pill standing wins from the treasury
+                  <div className="text-[10px] text-center text-zinc-500 mt-2">
+                    Connect once • Payouts automatic to your wallet if you win
                   </div>
                 </div>
               </div>

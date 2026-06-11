@@ -21,10 +21,8 @@ export const UI = ({ wallet, playerName }) => {
 
   return (
     <main
-      className={`fixed z-10 inset-0 pointer-events-none grid place-content-center
-      ${
-        stage === "lobby" ? "bg-black/40" : "bg-transparent"
-      } transition-colors duration-1000`}
+      className={`fixed z-10 inset-0 pointer-events-none 
+      ${stage === "lobby" ? "" : "bg-transparent"} transition-colors duration-1000`}
     >
       {/* Real players list (from Playroom + wallet info) */}
       <div className="absolute top-28 left-4 md:top-4 md:-translate-x-1/2 md:left-1/2 flex flex-col md:flex-row gap-4">
@@ -57,33 +55,32 @@ export const UI = ({ wallet, playerName }) => {
       </div>
 
       {stage === "lobby" && (
-        <div className="pointer-events-auto text-center max-w-md mx-auto">
-          <div className="mb-4">
-            <p className="text-white text-lg">Lobby open — take your time!</p>
-            <p className="text-emerald-300 text-sm mt-1">Connect wallet above (if not already) • Min 2 real players • Host starts when ready</p>
-            <p className="text-white/60 text-xs mt-2">Game will wait for players to join and set up. No rush — more time before it loads.</p>
-          </div>
+        <div className="pointer-events-auto absolute bottom-6 left-1/2 -translate-x-1/2 w-[94vw] max-w-[380px]">
+          <div className="bg-zinc-950/95 border border-zinc-700 rounded-3xl p-4 text-center text-white shadow-xl">
+            <p className="text-base font-semibold">Lobby open — take your time!</p>
+            <p className="text-emerald-300 text-xs mt-1 leading-tight">Connect wallet (bottom if not done) • Min 2 real players needed • Host starts the round when ready</p>
+            <p className="text-white/60 text-[10px] mt-1">The 3D arena is live below. No rush — plenty of time before the game begins.</p>
 
-          {host ? (
-            <button
-              className="bg-gradient-to-br from-orange-500 to-yellow-500 hover:opacity-90 transition-all px-16 py-4 rounded-2xl font-black text-2xl text-white shadow-xl"
-              onClick={startGame}
-            >
-              START GAME
-            </button>
-          ) : (
-            <div className="text-white/80">
-              Waiting for host to start...<br />
-              <span className="text-xs">Invite friends with the button below</span>
+            <div className="mt-3">
+              {host ? (
+                <button
+                  className="bg-gradient-to-br from-orange-500 to-yellow-500 hover:opacity-90 px-8 py-2.5 rounded-2xl font-black text-lg text-white"
+                  onClick={startGame}
+                >
+                  START GAME
+                </button>
+              ) : (
+                <p className="text-xs text-white/80">Waiting for host to start...</p>
+              )}
             </div>
-          )}
 
-          <button
-            onClick={openDiscordInviteDialog}
-            className="mt-3 block mx-auto text-sm underline text-white/70 hover:text-white"
-          >
-            INVITE FRIENDS
-          </button>
+            <button
+              onClick={openDiscordInviteDialog}
+              className="mt-2 text-xs underline text-white/60 hover:text-white"
+            >
+              INVITE FRIENDS
+            </button>
+          </div>
         </div>
       )}
 
