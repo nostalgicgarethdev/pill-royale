@@ -75,18 +75,20 @@ export const Experience = ({ wallet, playerName }) => {
       {/* Only render real players (pills) + controllers AFTER lobby (i.e. game has started) */}
       {/* This prevents white screen / crashes during initial render, wallet entry, or lobby phase */}
       {/* The arena itself is still visible for preview while waiting for more players */}
-      {showPlayers && players.map(({ state, controls }) => (
-        <CharacterController
-          key={state.id}
-          state={state}
-          controls={controls}
-          player={me && me.id === state.id}
-          firstNonDeadPlayer={firstNonDeadPlayer?.state?.id === state.id}
-          position-y={2}
-          wallet={wallet}
-          playerName={playerName}
-        />
-      ))}
+      {showPlayers && players
+        .filter(p => p && p.state && p.controls)
+        .map(({ state, controls }) => (
+          <CharacterController
+            key={state.id}
+            state={state}
+            controls={controls}
+            player={me && me.id === state.id}
+            firstNonDeadPlayer={firstNonDeadPlayer?.state?.id === state.id}
+            position-y={2}
+            wallet={wallet}
+            playerName={playerName}
+          />
+        ))}
 
       {/* Winner podium when someone wins */}
       {stage === "winner" && <Podium />}

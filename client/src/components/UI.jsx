@@ -26,16 +26,16 @@ export const UI = ({ wallet, playerName }) => {
     >
       {/* Real players list (from Playroom + wallet info) */}
       <div className="absolute top-28 left-4 md:top-4 md:-translate-x-1/2 md:left-1/2 flex flex-col md:flex-row gap-4">
-        {players.map((p) => (
+        {players.filter(p => p && p.state && p.state.state).map((p) => (
           <div key={p.state.id} className="flex flex-col items-center">
             <img
               className={`w-12 h-12 rounded-full ${
-                p.state.getState("dead") ? "filter grayscale" : ""
+                p.state.getState ? (p.state.getState("dead") ? "filter grayscale" : "") : ""
               }`}
-              src={p.state.state.profile.photo || "https://via.placeholder.com/48/22ff88/000?text=P"}
+              src={(p.state.state.profile && p.state.state.profile.photo) || "https://via.placeholder.com/48/22ff88/000?text=P"}
             />
             <p className="text-white max-w-20 truncate text-xs">
-              {p.state.state.profile?.name || p.state.state.name || 'Player'} {wallet && p.state.id === myPlayer()?.id ? "(You)" : ""}
+              {p.state.state.profile?.name || p.state.state.name || 'Player'} {wallet && p.state.id === (myPlayer && myPlayer()?.id) ? "(You)" : ""}
             </p>
           </div>
         ))}
