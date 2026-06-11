@@ -102,7 +102,7 @@ PRIZE_SOL=0.25 TREASURY_SECRET=... node server.js
 - When the round starts they all see each other move in real time.
 - The last real player (or the last survivor) gets paid automatically by the server if they have a wallet attached.
 
-Bots are used to fill empty slots so rounds are always exciting (configurable `MAX_TOTAL_PLAYERS`).
+Only real players are in the arena. A round starts when at least 2 real players have joined the lobby. No demo bots or AI fillers.
 
 ## Volume & bigger prizes
 

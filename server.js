@@ -825,7 +825,7 @@ async function start() {
       console.log('Bot wins will automatically return the prize to the treasury via self-transfer.');
     }
 
-    console.log('Real players connect → only real players in the arena (no demo bots).');
+    console.log('Real players connect → only real players in the arena (no demo bots). Rounds start at 2+ real players.');
     console.log('Winners with real wallets receive automatic on-chain payouts (no claiming).');
   });
 }
