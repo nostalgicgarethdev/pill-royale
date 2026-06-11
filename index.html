@@ -121,7 +121,7 @@
             <div id="how-it-works" class="hidden mt-3 bg-zinc-900/60 border border-zinc-800 rounded-2xl p-4 text-xs text-left text-zinc-400">
               <ul class="space-y-1 list-none">
                 <li>1. Connect with name + wallet. Multiple people can join the same live server.</li>
-                <li>2. Real players + bots drop into the hex arena together.</li>
+                <li>2. Only real players drop into the hex arena together.</li>
                 <li>3. Step on tiles → they crack and fall. Last pill standing wins.</li>
                 <li>4. The server automatically sends real SOL straight to the winner's wallet. No claiming.</li>
               </ul>
@@ -183,7 +183,7 @@
           </div>
 
           <div class="mt-4 bg-zinc-900 border border-zinc-800 rounded-2xl p-3">
-            <div class="text-xs font-medium text-zinc-400 px-2 mb-2">PILLS IN THE ARENA (real players + bots)</div>
+            <div class="text-xs font-medium text-zinc-400 px-2 mb-2">REAL PLAYERS IN THE ARENA</div>
             <div id="ingame-players" class="grid grid-cols-2 sm:grid-cols-4 gap-1 text-xs"></div>
           </div>
         </div>
@@ -444,7 +444,7 @@
         const isMe = p.name === userName || (p.walletShort && userWallet && p.walletShort.includes(userWallet.slice(0,4)));
         const d = document.createElement('div');
         d.className = `player-row flex items-center gap-x-2 px-2.5 py-1.5 rounded-xl ${p.eliminated?'opacity-50 line-through':''} ${isMe?'bg-emerald-950/40':'bg-zinc-950'}`;
-        d.innerHTML = `<div class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background:${p.color||'#3f3f46'}"></div><div class="flex-1 min-w-0"><div class="font-medium text-xs truncate">${p.name}${isMe?' <span class="text-emerald-400">(you)</span>':''}</div></div><div class="font-mono text-[9px] text-zinc-500">${p.walletShort|| (p.isBot?'BOT':'')}</div>`;
+        d.innerHTML = `<div class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background:${p.color||'#3f3f46'}"></div><div class="flex-1 min-w-0"><div class="font-medium text-xs truncate">${p.name}${isMe?' <span class="text-emerald-400">(you)</span>':''}</div></div><div class="font-mono text-[9px] text-zinc-500">${p.walletShort|| ''}</div>`;
         c.appendChild(d);
       });
       const left = document.getElementById('players-left'); if (left) left.textContent = live.length;

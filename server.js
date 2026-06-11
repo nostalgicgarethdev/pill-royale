@@ -19,7 +19,7 @@ const PORT = process.env.PORT || 3000;
 const CLUSTER = process.env.CLUSTER || 'mainnet-beta'; // 'mainnet-beta' or 'devnet' (mainnet is now default)
 const PRIZE_SOL = parseFloat(process.env.PRIZE_SOL || '0.1');
 const MAX_TOTAL_PLAYERS = 7;
-const MIN_REAL_TO_START = 1;
+const MIN_REAL_TO_START = 2; // only real players - no demo bots at all
 const ROUND_COUNTDOWN_MS = 6500;
 const TICK_MS = 55;
 const SHRINK_INTERVAL_MS = 16000; // longer rounds - outer rings collapse more slowly
@@ -208,7 +208,7 @@ async function sendPrizeToWinner(winnerWalletBase58) {
   }
 }
 
-// When a bot wins (or no real wallet winner), explicitly send the prize amount back into the treasury (self-transfer).
+// When no real wallet player wins, explicitly send the prize amount back into the treasury (self-transfer).
 // This creates a clear on-chain record that the prize was recycled.
 async function returnPrizeToTreasury() {
   if (!treasuryKeypair || !connection) {
@@ -241,7 +241,7 @@ async function returnPrizeToTreasury() {
       { commitment: 'confirmed', maxRetries: 3 }
     );
 
-    console.log(`[TREASURY RETURN] ${PRIZE_SOL} SOL sent back to treasury (bot won or no real winner).`);
+    console.log(`[TREASURY RETURN] ${PRIZE_SOL} SOL sent back to treasury (no real winner).`);
     console.log('  Signature:', signature);
 
     return { success: true, simulated: false, signature, amount: PRIZE_SOL, toTreasury: true };
@@ -295,7 +295,7 @@ class Game {
     this.MOVE_COOLDOWN = 165;
 
     this.tiles = new Map(); // key -> {durability, fallAt, fallen}
-    this.players = [];      // {id, name, wallet, q, r, color, eliminated, lastMoved, isBot, wsId? }
+    this.players = [];      // {id, name, wallet, q, r, color, eliminated, lastMoved, wsId? } (only real players now)
     this.startTime = Date.now();
     this.shrinkLevel = 0;
     this.lastShrink = Date.now() + 14000; // give players a decent head start before the arena starts shrinking hard
@@ -381,9 +381,8 @@ class Game {
   initPlayers(realPlayers) {
     this.players = [];
     const colors = ['#22ff88', '#f472b6', '#60a5fa', '#fbbf24', '#a78bfa', '#34d399', '#fb7185'];
-    const botNames = ['RedPill', 'SolCrush', '0xDrop', 'VitaminZ', 'HexHavoc', 'LastDose'];
 
-    // Add real players first
+    // Only real players - no demo bots
     const usedKeys = new Set();
     let posIndex = 0;
     const allPos = this.getAllHexes().sort((a, b) =>
@@ -407,36 +406,10 @@ class Game {
         color: colors[i % colors.length],
         eliminated: false,
         lastMoved: Date.now(),
-        isBot: false,
         wsId: rp.wsId || null,
         moveCooldownUntil: 0
       });
     });
-
-    // Fill with bots
-    const needed = MAX_TOTAL_PLAYERS - this.players.length;
-    for (let i = 0; i < needed; i++) {
-      let pos = allPos[posIndex % allPos.length];
-      while (usedKeys.has(hexKey(pos.q, pos.r))) {
-        posIndex++;
-        pos = allPos[posIndex % allPos.length];
-      }
-      usedKeys.add(hexKey(pos.q, pos.r));
-
-      this.players.push({
-        id: 'bot-' + (i + 1),
-        name: botNames[(i + realPlayers.length) % botNames.length],
-        wallet: null,
-        q: pos.q,
-        r: pos.r,
-        color: colors[(realPlayers.length + i) % colors.length],
-        eliminated: false,
-        lastMoved: Date.now(),
-        isBot: true,
-        moveCooldownUntil: 0,
-        nextBotMove: Date.now() + 300 + Math.random() * 500
-      });
-    }
   }
 
   canMoveTo(p, q, r) {
@@ -465,13 +438,13 @@ class Game {
 
     if (Math.random() < 0.32) this.damageTile(oldQ, oldR, 0.55);
 
-    if (p.isBot) p.nextBotMove = Date.now() + 480 + Math.random() * 280;
+    // no bot logic anymore - only real players
 
     return true;
   }
 
   applyHumanMove(playerId, directionIndex) {
-    const p = this.players.find(pl => pl.id === playerId && !pl.isBot);
+    const p = this.players.find(pl => pl.id === playerId);
     if (!p || p.eliminated) return false;
 
     const now = Date.now();
@@ -489,7 +462,7 @@ class Game {
   }
 
   applyHumanTargetMove(playerId, q, r) {
-    const p = this.players.find(pl => pl.id === playerId && !pl.isBot);
+    const p = this.players.find(pl => pl.id === playerId);
     if (!p || p.eliminated) return false;
     const now = Date.now();
     if (now < p.moveCooldownUntil) return false;
@@ -503,64 +476,6 @@ class Game {
       return true;
     }
     return false;
-  }
-
-  updateBots(now) {
-    const live = this.players.filter(p => !p.eliminated);
-    if (live.length < 2) return;
-
-    for (const bot of this.players) {
-      if (!bot.isBot || bot.eliminated) continue;
-      if (now < (bot.nextBotMove || 0)) continue;
-
-      const neighbors = getNeighbors(bot.q, bot.r);
-      let bestScore = -9999;
-      let best = null;
-
-      // consider staying
-      const stayScore = this.scorePosition(bot, bot.q, bot.r, live, now);
-      if (stayScore > bestScore) { bestScore = stayScore; best = { q: bot.q, r: bot.r }; }
-
-      for (const [nq, nr] of neighbors) {
-        if (!isValidHex(nq, nr)) continue;
-        const t = this.getTile(nq, nr);
-        if (t.fallen || (t.fallAt && now + 200 > t.fallAt)) continue;
-        const sc = this.scorePosition(bot, nq, nr, live, now);
-        if (sc > bestScore) { bestScore = sc; best = { q: nq, r: nr }; }
-      }
-
-      if (best && (best.q !== bot.q || best.r !== bot.r)) {
-        this.movePlayer(bot, best.q, best.r);
-      } else {
-        bot.nextBotMove = now + 260 + Math.random() * 220;
-      }
-    }
-  }
-
-  scorePosition(bot, q, r, live, now) {
-    const t = this.getTile(q, r);
-    if (t.fallen) return -100;
-    let score = t.durability * 5.2;
-
-    if (t.fallAt) {
-      const timeLeft = t.fallAt - now;
-      score -= Math.max(0, (900 - timeLeft) / 1.8);
-    }
-
-    const distCenter = Math.abs(q) + Math.abs(r) + Math.abs(q + r);
-    if (live.length <= 3) score -= distCenter * 1.15;
-    else score -= distCenter * 0.4;
-
-    if (live.length <= 4) {
-      let minDist = 99;
-      for (const o of live) {
-        if (o.id === bot.id) continue;
-        const d = hexDistance(q, r, o.q, o.r);
-        if (d < minDist) minDist = d;
-      }
-      score += (5.5 - minDist) * 1.7;
-    }
-    return score + (Math.random() * 1.2 - 0.4);
   }
 
   applyShrink(now) {
@@ -588,7 +503,6 @@ class Game {
 
     const now = Date.now();
     this.updateFalling();
-    this.updateBots(now);
     this.applyShrink(now);
 
     // Passive stress (slowed down for longer rounds)
@@ -617,12 +531,11 @@ class Game {
       players: this.players.map(p => ({
         id: p.id,
         name: p.name,
-        walletShort: p.wallet ? (p.wallet.slice(0, 4) + '..' + p.wallet.slice(-4)) : (p.isBot ? 'BOT' : 'YOU'),
+        walletShort: p.wallet ? (p.wallet.slice(0, 4) + '..' + p.wallet.slice(-4)) : 'YOU',
         q: p.q,
         r: p.r,
         color: p.color,
-        eliminated: p.eliminated,
-        isBot: p.isBot
+        eliminated: p.eliminated
       })),
       tiles: tileStates,
       time: Date.now() - this.startTime,
@@ -679,16 +592,16 @@ function startNewRoundIfPossible() {
 
   currentGame = new Game(realParticipants);
   roundInProgress = true;
-  lobby = []; // clear lobby for next
+  lobby = []; // clear lobby for next round (only real players)
 
-  console.log(`[ROUND] Started with ${realParticipants.length} real players + bots. Prize: ${PRIZE_SOL} SOL`);
+  console.log(`[ROUND] Started with ${realParticipants.length} real players. Prize: ${PRIZE_SOL} SOL`);
 
   // Notify everyone
   broadcast('round_start', {
     roundId: Date.now(),
     prize: PRIZE_SOL,
     players: currentGame.players.map(p => ({
-      id: p.id, name: p.name, isBot: p.isBot, walletShort: p.wallet ? p.wallet.slice(0,4)+'..'+p.wallet.slice(-4) : 'BOT'
+      id: p.id, name: p.name, walletShort: p.wallet ? p.wallet.slice(0,4)+'..'+p.wallet.slice(-4) : 'YOU'
     }))
   });
 
@@ -728,18 +641,17 @@ function handleRoundEnd() {
   // Real payout or recycle to treasury
   (async () => {
     let payoutResult;
-    if (winner && winner.wallet && !winner.isBot) {
+    if (winner && winner.wallet) {
       payoutResult = await sendPrizeToWinner(winner.wallet);
     } else {
-      // Bot won (or no real-wallet survivor) → send the prize back into the treasury
+      // No real wallet winner → send the prize back into the treasury
       payoutResult = await returnPrizeToTreasury();
     }
 
     const payload = {
       winner: winner ? { 
         id: winner.id, 
-        name: winner.name, 
-        isBot: !!winner.isBot,
+        name: winner.name,
         wallet: winner.wallet || null 
       } : null,
       payout: payoutResult,
@@ -817,7 +729,7 @@ wss.on('connection', (ws) => {
 
     if (msg.type === 'move' && currentGame && roundInProgress) {
       // Find the real player belonging to this ws
-      const player = currentGame.players.find(p => p.wsId === c.id && !p.isBot);
+      const player = currentGame.players.find(p => p.wsId === c.id);
       if (player && !player.eliminated) {
         let moved = false;
         if (typeof msg.dir === 'number') {
@@ -913,7 +825,7 @@ async function start() {
       console.log('Bot wins will automatically return the prize to the treasury via self-transfer.');
     }
 
-    console.log('Real players connect → they play together + bots fill the arena.');
+    console.log('Real players connect → only real players in the arena (no demo bots).');
     console.log('Winners with real wallets receive automatic on-chain payouts (no claiming).');
   });
 }
