@@ -95,11 +95,26 @@ function loadOrCreateTreasury() {
     // Only auto-generate on non-mainnet by default for safety
     if (isMainnet) {
       console.error('\n!!! CRITICAL: No treasury key found for MAINNET !!!');
-      console.error('Provide your mainnet private key via environment variable:');
+      console.error('');
+      console.error('For LOCAL testing:');
       console.error('  TREASURY_SECRET=YourBase58PrivateKeyHere node server.js');
-      console.error('Or place a funded treasury.json (64-byte array) in this folder.');
-      console.error('DO NOT commit treasury.json or any secret to git.');
-      process.exit(1); // refuse to start on mainnet without explicit key
+      console.error('');
+      console.error('For DEPLOYED WEBSITE (Railway / Render / etc.):');
+      console.error('  In your hosting platform dashboard, add an Environment Variable:');
+      console.error('    Name:  TREASURY_SECRET');
+      console.error('    Value: YourBase58PrivateKeyHere');
+      console.error('');
+      console.error('  Then redeploy. The live site will use your mainnet wallet for automatic payouts.');
+      console.error('');
+      console.error('How to get YourBase58PrivateKeyHere:');
+      console.error('  In Phantom → Account → Export Private Key (copy the long base58 string).');
+      console.error('');
+      console.error('Security:');
+      console.error('  - Use a dedicated wallet that only holds the prize money you want to risk.');
+      console.error('  - NEVER commit the key to git or put it in code.');
+      console.error('  - On platforms, always use the secret/env var UI (never in repo).');
+      console.error('');
+      process.exit(1);
     }
 
     // Devnet / test: auto-generate for convenience
