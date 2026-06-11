@@ -19,6 +19,7 @@ const PORT = process.env.PORT || 3000;
 const CLUSTER = process.env.CLUSTER || 'mainnet-beta'; // 'mainnet-beta' or 'devnet' (mainnet is now default)
 const PRIZE_SOL = parseFloat(process.env.PRIZE_SOL || '0.1');
 const MAX_TOTAL_PLAYERS = 7;
+const WORLD_SCALE = 0.09; // matches client 3D scale for hexToWorld
 const MIN_REAL_TO_START = 2; // only real players - no demo bots at all
 const ROUND_COUNTDOWN_MS = 6500;
 const TICK_MS = 55;
@@ -278,6 +279,18 @@ function pixelToHex(px, py, size = 36) {
   return hexRound(q, r);
 }
 
+// World <-> hex for 3D continuous movement (simple but easy to play)
+function worldToHex(wx, wz) {
+  const px = wx / WORLD_SCALE;
+  const pz = wz / WORLD_SCALE;
+  return pixelToHex(px, pz);
+}
+
+function hexToWorld(q, r) {
+  const p = hexToPixel(q, r);
+  return { x: p.x * WORLD_SCALE, z: p.y * WORLD_SCALE };
+}
+
 function hexRound(q, r) {
   let s = -q - r;
   let rq = Math.round(q), rr = Math.round(r), rs = Math.round(s);
@@ -290,15 +303,17 @@ function hexRound(q, r) {
 class Game {
   constructor(realPlayers) {
     this.radius = 5;
-    this.START_DURABILITY = 4;   // tiles are tougher → rounds last longer
-    this.FALL_DELAY = 1050;      // more time before a cracked tile actually disappears
-    this.MOVE_COOLDOWN = 165;
+    this.START_DURABILITY = 4;
+    this.FALL_DELAY = 1050;
+    this.WORLD_SCALE = WORLD_SCALE;
 
     this.tiles = new Map(); // key -> {durability, fallAt, fallen}
-    this.players = [];      // {id, name, wallet, q, r, color, eliminated, lastMoved, wsId? } (only real players now)
+    // Continuous 3D positions for simple easy-to-play movement (like lolbeans)
+    // x,z on plane, y for jump/height
+    this.players = [];      // {id, name, wallet, x, y, z, color, eliminated, lastMoved, wsId?, vy:0 }
     this.startTime = Date.now();
     this.shrinkLevel = 0;
-    this.lastShrink = Date.now() + 14000; // give players a decent head start before the arena starts shrinking hard
+    this.lastShrink = Date.now() + 14000;
     this.winner = null;
     this.ended = false;
     this.prizeSOL = PRIZE_SOL;
@@ -382,7 +397,7 @@ class Game {
     this.players = [];
     const colors = ['#22ff88', '#f472b6', '#60a5fa', '#fbbf24', '#a78bfa', '#34d399', '#fb7185'];
 
-    // Only real players - no demo bots
+    // Only real players - continuous 3D positions (simple WASD + jump)
     const usedKeys = new Set();
     let posIndex = 0;
     const allPos = this.getAllHexes().sort((a, b) =>
@@ -397,17 +412,20 @@ class Game {
       }
       usedKeys.add(hexKey(pos.q, pos.r));
 
+      const wpos = hexToWorld(pos.q, pos.r);
       this.players.push({
         id: rp.id,
         name: rp.name || `Player${i}`,
         wallet: rp.wallet,
-        q: pos.q,
-        r: pos.r,
+        x: wpos.x,
+        y: 1.0,
+        z: wpos.z,
         color: colors[i % colors.length],
         eliminated: false,
         lastMoved: Date.now(),
         wsId: rp.wsId || null,
-        moveCooldownUntil: 0
+        vy: 0,           // vertical velocity for jump
+        onGround: true
       });
     });
   }
@@ -467,15 +485,57 @@ class Game {
     const now = Date.now();
     if (now < p.moveCooldownUntil) return false;
 
-    // Only allow adjacent (cube distance 1)
-    const dist = hexDistance(p.q, p.r, q, r);
-    if (dist !== 1) return false;
+    // Continuous position update from client (simple & easy to play)
+  updatePlayerPosition(pid, wx, wy, wz) {
+    const p = this.players.find(pl => pl.id === pid);
+    if (!p || p.eliminated) return;
 
-    if (this.movePlayer(p, q, r)) {
-      p.moveCooldownUntil = now + this.MOVE_COOLDOWN;
-      return true;
+    const now = Date.now();
+    p.x = wx;
+    p.y = wy;
+    p.z = wz;
+    p.lastMoved = now;
+
+    // Determine which hex tile the player is on (for crumbling mechanic)
+    const tileCoord = worldToHex(wx, wz);
+    if (isValidHex(tileCoord.q, tileCoord.r)) {
+      this.damageTile(tileCoord.q, tileCoord.r, 0.6); // step damage
     }
-    return false;
+
+    // Simple ground check
+    p.onGround = (p.y <= 1.1);
+  }
+
+  // Apply simple server-side physics + crumbling check (keeps it fair for real SOL)
+  applyPhysicsAndCrumble(p, dt) {
+    if (p.eliminated) return;
+
+    // Gravity
+    p.vy = (p.vy || 0) + GRAVITY * dt;
+    p.y += p.vy * dt;
+
+    // Ground / tile height
+    const tileCoord = worldToHex(p.x, p.z);
+    let groundY = 1.0;
+    if (isValidHex(tileCoord.q, tileCoord.r)) {
+      const t = this.getTile(tileCoord.q, tileCoord.r);
+      if (t.fallen) groundY = -5;
+      else if (t.fallAt) {
+        const fallProgress = Math.max(0, (Date.now() - t.fallAt) / this.FALL_DELAY);
+        groundY = 1.0 - fallProgress * 3;
+      }
+    }
+
+    if (p.y < groundY) {
+      p.y = groundY;
+      p.vy = 0;
+      p.onGround = true;
+    }
+
+    // Elimination: fell through crumbling floor
+    if (p.y < -2) {
+      this.eliminatePlayer(p, true);
+    }
   }
 
   applyShrink(now) {
@@ -502,17 +562,14 @@ class Game {
     if (this.ended) return;
 
     const now = Date.now();
+    const dt = 1 / 20;
+
     this.updateFalling();
     this.applyShrink(now);
 
-    // Passive stress (slowed down for longer rounds)
     for (const p of this.players) {
       if (p.eliminated) continue;
-      const stand = now - p.lastMoved;
-      if (stand > 1400) {
-        const extra = Math.floor((stand - 1300) / 650);
-        if (extra > 0) this.damageTile(p.q, p.r, Math.min(0.9, extra * 0.4));
-      }
+      this.applyPhysicsAndCrumble(p, dt);
     }
 
     this.checkWin();
@@ -532,8 +589,9 @@ class Game {
         id: p.id,
         name: p.name,
         walletShort: p.wallet ? (p.wallet.slice(0, 4) + '..' + p.wallet.slice(-4)) : 'YOU',
-        q: p.q,
-        r: p.r,
+        x: p.x,
+        y: p.y,
+        z: p.z,
         color: p.color,
         eliminated: p.eliminated
       })),
@@ -735,18 +793,33 @@ wss.on('connection', (ws) => {
     }
 
     if (msg.type === 'move' && currentGame && roundInProgress) {
-      // Find the real player belonging to this ws
+      // Legacy discrete support (can be removed later)
       const player = currentGame.players.find(p => p.wsId === c.id);
       if (player && !player.eliminated) {
         let moved = false;
         if (typeof msg.dir === 'number') {
-          moved = currentGame.applyHumanMove(player.id, msg.dir);
+          // ignore for continuous mode
         } else if (msg.q !== undefined && msg.r !== undefined) {
-          moved = currentGame.applyHumanTargetMove(player.id, msg.q, msg.r);
+          // convert to world for simplicity
+          const w = hexToWorld(msg.q, msg.r);
+          currentGame.updatePlayerPosition(player.id, w.x, 1.0, w.z);
+          moved = true;
         }
         if (moved) {
-          // immediate state push for responsiveness
           broadcast('state', currentGame.getPublicState());
+        }
+      }
+    }
+
+    if (msg.type === 'pos' && currentGame && roundInProgress) {
+      // Continuous position from client (simple & easy to play)
+      const player = currentGame.players.find(p => p.wsId === c.id);
+      if (player && !player.eliminated && typeof msg.x === 'number') {
+        currentGame.updatePlayerPosition(player.id, msg.x, msg.y || 1.0, msg.z);
+        // Throttled broadcast for performance
+        if (!currentGame.lastPosBroadcast || (Date.now() - currentGame.lastPosBroadcast) > 60) {
+          broadcast('state', currentGame.getPublicState());
+          currentGame.lastPosBroadcast = Date.now();
         }
       }
     }

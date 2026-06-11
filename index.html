@@ -240,6 +240,7 @@
     let tileObjects = {};
     let playerObjects = {};
     let threeReady = false;
+    let meMesh = null; // reference to local player's 3D object for easy controls
 
     const HEX_SIZE = 36;
     const GRID_RADIUS = 5;
@@ -415,38 +416,68 @@
       document.getElementById('lobby-count').textContent = `${(data.players||[]).length}/${data.max||7}`;
     }
 
-    function sendMove(val) {
+    // Continuous movement state (simple & easy like lolbeans)
+    let moveKeys = { w: false, a: false, s: false, d: false };
+    let isJumping = false;
+    let playerVel = { x: 0, y: 0, z: 0 };
+    const MOVE_SPEED = 8;
+    const JUMP_FORCE = 12;
+    const GRAVITY = -25;
+
+    function sendPosition() {
       if (!ws || ws.readyState !== WebSocket.OPEN || !isPlaying) return;
-      if (typeof val === 'number') ws.send(JSON.stringify({type:'move', dir: val}));
-      else if (val && val.q != null) ws.send(JSON.stringify({type:'move', q: val.q, r: val.r}));
+      // Send continuous position to server for sync (server validates crumbling/elim)
+      const me = renderPlayers.find(p => p.id === 'human' || (p.walletShort && userWallet && p.walletShort.includes(userWallet.slice(0,4))));
+      if (me && meMesh) {
+        ws.send(JSON.stringify({
+          type: 'pos',
+          x: meMesh.position.x,
+          y: meMesh.position.y,
+          z: meMesh.position.z
+        }));
+      }
     }
+
+    // Simple continuous controls (WASD move relative to camera, Space jump)
+    window.addEventListener('keydown', e => {
+      if (!isPlaying) return;
+      const k = e.key.toLowerCase();
+      if (['w','a','s','d'].includes(k)) moveKeys[k] = true;
+      if (k === ' ' && !isJumping && meMesh && meMesh.position.y < 1.5) { // simple ground check
+        playerVel.y = JUMP_FORCE;
+        isJumping = true;
+        e.preventDefault();
+      }
+    });
+    window.addEventListener('keyup', e => {
+      const k = e.key.toLowerCase();
+      if (['w','a','s','d'].includes(k)) moveKeys[k] = false;
+    });
+
+    // Touch: simple virtual joystick direction (easy mobile play)
+    let touchStart = null;
+    canvas.addEventListener('touchstart', e => {
+      if (!isPlaying) return;
+      touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }, {passive: true});
+    canvas.addEventListener('touchmove', e => {
+      if (!isPlaying || !touchStart) return;
+      const dx = e.touches[0].clientX - touchStart.x;
+      const dy = e.touches[0].clientY - touchStart.y;
+      moveKeys.w = dy < -20;
+      moveKeys.s = dy > 20;
+      moveKeys.a = dx < -20;
+      moveKeys.d = dx > 20;
+    });
+    canvas.addEventListener('touchend', () => {
+      touchStart = null;
+      Object.keys(moveKeys).forEach(k => moveKeys[k] = false);
+    });
 
     function setupInput() {
       canvas = document.getElementById('game-canvas');
-      // No 2D context - using WebGL/Three.js for 3D mode
-      // canvas.addEventListener for click is added dynamically in 3D round_start for raycast
-
-      window.addEventListener('keydown', e => {
-        if (!isPlaying) return;
-        let d = -1;
-        if (['w','arrowup'].includes(e.key.toLowerCase())) d=5;
-        else if (e.key.toLowerCase()==='e') d=0;
-        else if (['d','arrowright'].includes(e.key.toLowerCase())) d=1;
-        else if (['s','arrowdown'].includes(e.key.toLowerCase())) d=2;
-        else if (['a','arrowleft'].includes(e.key.toLowerCase())) d=4;
-        else if (e.key.toLowerCase()==='q') d=3;
-        if (d>=0) { e.preventDefault(); sendMove(d); }
-      });
-
-      let ts = null;
-      canvas.addEventListener('touchstart', e => { if (isPlaying) ts = {x:e.touches[0].clientX, y:e.touches[0].clientY}; }, {passive:true});
-      canvas.addEventListener('touchend', e => {
-        if (!isPlaying || !ts) return;
-        const rect = canvas.getBoundingClientRect();
-        const h = pixelToHex(e.changedTouches[0].clientX - rect.left - canvas.width/2, e.changedTouches[0].clientY - rect.top - canvas.height/2 - 10);
-        if (isValidHex(h.q, h.r)) sendMove(h);
-        ts = null;
-      });
+      // Input listeners for 3D continuous movement are set globally above for simplicity
+      // (WASD + Space jump, touch virtual joystick)
     }
 
     function updatePrizeDisplay() {
@@ -659,7 +690,11 @@
 
     function updateThree() {
       if (!threeReady || !renderer || !scene || !camera) return;
-      // Tiles
+
+      const now = Date.now();
+      const dt = 1 / 60;
+
+      // Tiles (3D sinking platforms - core crumbling mechanic)
       const allHexes = getAllHexes();
       for (const h of allHexes) {
         const key = hexKey(h.q, h.r);
@@ -672,47 +707,102 @@
         if (state.fallen) {
           m.position.y = -4;
         } else if (state.fallAt) {
-          const t = Math.max(0, (Date.now() - state.fallAt) / 900);
+          const t = Math.max(0, (now - state.fallAt) / 900);
           m.position.y = 0.18 - t * 2.5;
         } else {
           m.position.y = 0.18;
         }
       }
-      // Players
+
+      // Players - continuous 3D positions + local simulation for responsiveness
+      const myId = 'human'; // or match by walletShort
       for (const p of renderPlayers) {
         const key = p.id;
         if (!playerObjects[key]) {
           playerObjects[key] = createPlayerMesh3D(p);
         }
         const obj = playerObjects[key];
-        const pos2d = hexToPixel(p.q, p.r);
-        obj.position.x = pos2d.x * 0.09;
-        obj.position.z = pos2d.y * 0.09;
-        // Sink with tile
-        const ts = renderTiles.get(hexKey(p.q, p.r)) || {};
-        if (p.eliminated || ts.fallen) {
-          obj.position.y = -2.5;
-        } else if (ts.fallAt) {
-          const t = Math.max(0, (Date.now() - ts.fallAt) / 900);
-          obj.position.y = 1.0 - t * 2.5;
+
+        // Use server position for others, local sim for self
+        let targetX = p.x || 0;
+        let targetY = p.y || 1.0;
+        let targetZ = p.z || 0;
+
+        const isLocal = (p.id === myId || (p.walletShort && userWallet && p.walletShort.includes(userWallet.slice(0,4))));
+        if (isLocal) {
+          meMesh = obj; // keep reference
+
+          // Local player: apply WASD + jump (easy to play, feels responsive like lolbeans)
+          const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).setY(0).normalize();
+          const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion).setY(0).normalize();
+
+          let mx = 0, mz = 0;
+          if (moveKeys.w) { mx += forward.x; mz += forward.z; }
+          if (moveKeys.s) { mx -= forward.x; mz -= forward.z; }
+          if (moveKeys.a) { mx -= right.x; mz -= right.z; }
+          if (moveKeys.d) { mx += right.x; mz += right.z; }
+
+          const len = Math.sqrt(mx*mx + mz*mz);
+          if (len > 0) {
+            mx /= len; mz /= len;
+            obj.position.x += mx * MOVE_SPEED * dt;
+            obj.position.z += mz * MOVE_SPEED * dt;
+          }
+
+          // Gravity + jump (client side for feel, server validates crumbling)
+          playerVel.y = (playerVel.y || 0) + GRAVITY * dt;
+          obj.position.y += playerVel.y * dt;
+
+          // Simple ground
+          if (obj.position.y < 1.0) {
+            obj.position.y = 1.0;
+            playerVel.y = 0;
+            isJumping = false;
+          }
+
+          // Send to server throttled
+          if (Math.random() < 0.3) sendPosition();
+
+          targetX = obj.position.x;
+          targetY = obj.position.y;
+          targetZ = obj.position.z;
+        }
+
+        // Lerp others, direct for self
+        if (p.id === myId || (p.walletShort && userWallet && p.walletShort.includes(userWallet.slice(0,4)))) {
+          obj.position.x = targetX;
+          obj.position.y = targetY;
+          obj.position.z = targetZ;
         } else {
-          obj.position.y = 1.0;
+          obj.position.x += (targetX - obj.position.x) * 0.3;
+          obj.position.y += (targetY - obj.position.y) * 0.3;
+          obj.position.z += (targetZ - obj.position.z) * 0.3;
+        }
+
+        // Sink with tile (visual)
+        const ts = renderTiles.get(hexKey(p.q || 0, p.r || 0)) || {}; // fallback if no q/r
+        // For continuous, better to find nearest tile but keep simple
+        if (p.eliminated) {
+          obj.position.y = -2.5;
         }
       }
-      // Camera follow (simple third-person like)
-      const me = renderPlayers.find(pp => pp.id === 'human' || (pp.walletShort && userWallet && pp.walletShort.includes(userWallet.slice(0,4))));
-      if (me) {
-        const p2 = hexToPixel(me.q, me.r);
-        const wx = p2.x * 0.09;
-        const wz = p2.y * 0.09;
-        camera.position.x = wx + 12;
-        camera.position.z = wz + 18;
-        camera.position.y = 16;
-        camera.lookAt(wx, 3, wz);
-      } else {
-        camera.position.set(0, 22, 28);
-        camera.lookAt(0, 1, 0);
+
+      // Camera follow (third-person, easy)
+      const meP = renderPlayers.find(pp => pp.id === myId || (pp.walletShort && userWallet && pp.walletShort.includes(userWallet.slice(0,4))));
+      let wx = 0, wz = 0, wy = 3;
+      if (meMesh) {
+        wx = meMesh.position.x;
+        wz = meMesh.position.z;
+        wy = meMesh.position.y;
+      } else if (meP && meP.x != null) {
+        wx = meP.x; wz = meP.z; wy = meP.y || 3;
       }
+
+      camera.position.x = wx + 12;
+      camera.position.z = wz + 16;
+      camera.position.y = Math.max(10, wy + 14);
+      camera.lookAt(wx, wy + 2, wz);
+
       renderer.render(scene, camera);
     }
 
