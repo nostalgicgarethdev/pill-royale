@@ -168,6 +168,10 @@ function App() {
                         }
                         setPlayerName(nameInput);
                         setWallet(addrInput);
+
+                        // Clean the URL hash (removes #r=ROOMCODE that PlayroomKit adds)
+                        // so the address bar stays clean and doesn't "keep saying" the room link
+                        window.history.replaceState(null, '', window.location.pathname);
                       }}
                       className="w-full bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-black font-semibold py-2.5 rounded-2xl text-sm transition"
                     >

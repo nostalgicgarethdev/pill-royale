@@ -35,7 +35,7 @@ export const UI = ({ wallet, playerName }) => {
               src={p.state.state.profile.photo || "https://via.placeholder.com/48/22ff88/000?text=P"}
             />
             <p className="text-white max-w-20 truncate text-xs">
-              {p.state.state.profile.name} {wallet && p.state.id === myPlayer()?.id ? "(You)" : ""}
+              {p.state.state.profile?.name || p.state.state.name || 'Player'} {wallet && p.state.id === myPlayer()?.id ? "(You)" : ""}
             </p>
           </div>
         ))}
@@ -85,12 +85,14 @@ export const UI = ({ wallet, playerName }) => {
               )}
             </div>
 
-            <button
+            {/* Removed INVITE to avoid exposing the Playroom room code #r=... in links.
+                Users share the clean main URL. The server enforces the single official game. */}
+            {/* <button
               onClick={openDiscordInviteDialog}
               className="mt-2 text-xs underline text-white/60 hover:text-white"
             >
               INVITE FRIENDS
-            </button>
+            </button> */}
           </div>
         </div>
       )}
