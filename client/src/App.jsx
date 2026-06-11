@@ -8,30 +8,21 @@ import { UI } from "./components/UI";
 import { AudioManagerProvider } from "./hooks/useAudioManager";
 import { GameStateProvider } from "./hooks/useGameState";
 
-// Solana wallet connect (Phantom) + name for real players + SOL payouts
-async function connectWallet(setWallet, setName) {
+// Solana wallet connect (Phantom) for real players + SOL payouts
+// Name comes from the form input above
+async function connectWallet(setWallet, nameToUse) {
   if (window.solana && window.solana.isPhantom) {
     try {
       const resp = await window.solana.connect();
       const addr = resp.publicKey.toString();
       setWallet(addr);
-      // Simple name from wallet or prompt
-      const n = prompt("Enter display name (or leave for anon)", "PillPlayer") || "PillPlayer";
-      setName(n);
-      // Send to server for join (the backend server.js handles real players + treasury)
-      // For now, store; in full game, connect WS and send {name, wallet}
       console.log("Wallet connected for real SOL:", addr);
-      alert("Wallet connected! Real players only. Payouts to this wallet on win.");
+      // The name is already set from the input in the onClick
     } catch (err) {
-      alert("Phantom connection failed. You can paste address manually later.");
+      alert("Phantom connection failed or was cancelled. You can still paste the address using the button below.");
     }
   } else {
-    const addr = prompt("Paste your Solana wallet address for payouts (or cancel for demo):");
-    if (addr) {
-      setWallet(addr);
-      const n = prompt("Display name:") || "PillPlayer";
-      setName(n);
-    }
+    alert("Phantom wallet not detected. Use the 'Paste Address' button instead, or install Phantom extension.");
   }
 }
 
@@ -71,24 +62,63 @@ function App() {
             </Canvas>
             <UI wallet={wallet} playerName={playerName} />
             
-            {/* Wallet / Entry UI - real players + SOL (top or overlay) */}
+            {/* Clean, easy wallet entry - no black screen blocking the 3D start view */}
             {!wallet && (
-              <div style={{
-                position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)',
-                background: 'rgba(0,0,0,0.8)', padding: '20px', borderRadius: '12px',
-                color: 'white', textAlign: 'center', zIndex: 100
-              }}>
-                <h2>Pill Royale - Real SOL (Mainnet)</h2>
-                <p>Only real players. Last pill standing wins from treasury.</p>
-                <button 
-                  onClick={() => connectWallet(setWallet, setPlayerName)}
-                  style={{ padding: '12px 24px', fontSize: '16px', cursor: 'pointer', marginTop: '10px' }}
-                >
-                  Connect Phantom Wallet or Paste Address
-                </button>
-                <p style={{ fontSize: '12px', marginTop: '10px', opacity: 0.7 }}>
-                  Your wallet is used only for payouts. No gas for playing.
-                </p>
+              <div className="absolute inset-0 flex items-center justify-center z-50 pointer-events-auto bg-black/40">
+                <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-8 max-w-md w-full mx-4 text-white shadow-2xl">
+                  <div className="text-center mb-6">
+                    <div className="text-4xl mb-2">💊</div>
+                    <h1 className="text-3xl font-bold tracking-tight">PILL ROYALE</h1>
+                    <p className="text-emerald-400 mt-1">Real SOL • Mainnet • Only real players</p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-400 mb-1">Display Name</label>
+                      <input 
+                        type="text" 
+                        id="player-name-input"
+                        defaultValue="PillPlayer"
+                        className="w-full bg-zinc-800 border border-zinc-700 focus:border-emerald-500 rounded-xl px-4 py-3 text-lg outline-none"
+                        placeholder="Your name"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-400 mb-1">Solana Wallet (for automatic payout)</label>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => {
+                            const nameInput = document.getElementById('player-name-input').value.trim() || 'PillPlayer';
+                            setPlayerName(nameInput);
+                            connectWallet(setWallet, nameInput);
+                          }}
+                          className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-black font-semibold py-3 rounded-xl transition"
+                        >
+                          Connect Phantom
+                        </button>
+                        <button 
+                          onClick={() => {
+                            const nameInput = document.getElementById('player-name-input').value.trim() || 'PillPlayer';
+                            const addr = prompt('Paste your Solana wallet address for real SOL payouts:');
+                            if (addr) {
+                              setWallet(addr);
+                              setPlayerName(nameInput);
+                            }
+                          }}
+                          className="px-4 py-3 border border-zinc-700 hover:bg-zinc-800 rounded-xl text-sm"
+                        >
+                          Paste Address
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-zinc-500 mt-1">Your wallet receives the prize automatically if you win. No gas fees to play.</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 text-center text-xs text-zinc-500">
+                    3D hex crumbling arena • Last real pill standing wins from the treasury
+                  </div>
+                </div>
               </div>
             )}
           </div>

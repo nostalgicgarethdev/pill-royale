@@ -57,32 +57,34 @@ export const UI = ({ wallet, playerName }) => {
       </div>
 
       {stage === "lobby" && (
-        <>
+        <div className="pointer-events-auto text-center max-w-md mx-auto">
+          <div className="mb-4">
+            <p className="text-white text-lg">Lobby open — take your time!</p>
+            <p className="text-emerald-300 text-sm mt-1">Connect wallet above (if not already) • Min 2 real players • Host starts when ready</p>
+            <p className="text-white/60 text-xs mt-2">Game will wait for players to join and set up. No rush — more time before it loads.</p>
+          </div>
+
           {host ? (
             <button
-              className="pointer-events-auto 
-              bg-gradient-to-br from-orange-500 to-yellow-500 
-              hover:opacity-80 transition-all duration-200 
-              px-12 py-4 rounded-lg font-black text-xl text-white drop-shadow-lg"
+              className="bg-gradient-to-br from-orange-500 to-yellow-500 hover:opacity-90 transition-all px-16 py-4 rounded-2xl font-black text-2xl text-white shadow-xl"
               onClick={startGame}
             >
-              START (Real Players Only)
+              START GAME
             </button>
           ) : (
-            <p className="italic text-white">
-              Waiting for the host to start the game...
-            </p>
+            <div className="text-white/80">
+              Waiting for host to start...<br />
+              <span className="text-xs">Invite friends with the button below</span>
+            </div>
           )}
+
           <button
-            className="mt-4 pointer-events-auto 
-            bg-gradient-to-br from-orange-500 to-yellow-500 
-            hover:opacity-80 transition-all duration-200 
-            px-12 py-4 rounded-lg font-black text-xl text-white drop-shadow-lg"
             onClick={openDiscordInviteDialog}
+            className="mt-3 block mx-auto text-sm underline text-white/70 hover:text-white"
           >
-            INVITE
+            INVITE FRIENDS
           </button>
-        </>
+        </div>
       )}
 
       {/* Winner payout trigger (integrates with treasury) */}
