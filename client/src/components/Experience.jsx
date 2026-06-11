@@ -31,7 +31,15 @@ export const Experience = ({ wallet, playerName }) => {
     } else if (stage === "countdown") {
       camera.position.set(0, 50, -50);
     }
-  }, [stage]);
+  }, [stage, camera]);
+
+  const isLobby = stage === "lobby";
+  const showPlayers = !isLobby && players.length > 0;
+
+  // Safe access for firstNonDeadPlayer (Playroom state may not be ready in lobby)
+  const firstNonDeadPlayer = !isLobby 
+    ? players.find((p) => p.state && !p.state.getState("dead")) 
+    : null;
 
   return (
     <>
@@ -62,14 +70,16 @@ export const Experience = ({ wallet, playerName }) => {
       {/* Always show the crumbling hex arena - this is the main visual before/during game */}
       <GameArena />
 
-      {/* Real players (pills) moving around the arena */}
-      {players.map(({ state, controls }) => (
+      {/* Only render real players (pills) + controllers AFTER lobby (i.e. game has started) */}
+      {/* This prevents white screen / crashes during initial render, wallet entry, or lobby phase */}
+      {/* The arena itself is still visible for preview while waiting for more players */}
+      {showPlayers && players.map(({ state, controls }) => (
         <CharacterController
           key={state.id}
           state={state}
           controls={controls}
-          player={me.id === state.id}
-          firstNonDeadPlayer={firstNonDeadPlayer?.state.id === state.id}
+          player={me && me.id === state.id}
+          firstNonDeadPlayer={firstNonDeadPlayer?.state?.id === state.id}
           position-y={2}
           wallet={wallet}
           playerName={playerName}
@@ -80,4 +90,5 @@ export const Experience = ({ wallet, playerName }) => {
       {stage === "winner" && <Podium />}
     </>
   );
+};
 };

@@ -3,7 +3,7 @@ import { Physics } from "@react-three/rapier";
 import { Experience } from "./components/Experience";
 
 import { KeyboardControls } from "@react-three/drei";
-import { useMemo, useState, useEffect, Component } from "react";
+import { useMemo, useState, useEffect, Component, Suspense } from "react";
 
 class ErrorBoundary extends Component {
   constructor(props) {
@@ -124,9 +124,11 @@ function App() {
           <div style={{ position: 'relative', width: '100vw', height: '100vh', background: '#041c0b' }}>
             <Canvas shadows camera={{ position: [0, 16, 10], fov: 42 }}>
               <color attach="background" args={["#041c0b"]} />
-              <Physics>
-                <Experience wallet={wallet} playerName={playerName} />
-              </Physics>
+              <Suspense fallback={null}>
+                <Physics>
+                  <Experience wallet={wallet} playerName={playerName} />
+                </Physics>
+              </Suspense>
             </Canvas>
             <UI wallet={wallet} playerName={playerName} canStartOfficial={canStartOfficial} />
             
