@@ -50,18 +50,35 @@ function loadOrCreateTreasury() {
   if (envSecret && envSecret.length > 20) {
     try {
       let secretBytes;
-      // Try base58 first (most common from Phantom export / solana-keygen)
+      let usedMethod = 'unknown';
+
+      // Try base58 first (most common from Phantom "Export Private Key")
       try {
         const bs58 = require('bs58');
-        secretBytes = bs58.decode(envSecret);
-      } catch {
-        // Fallback: maybe they passed a JSON array as string
-        secretBytes = JSON.parse(envSecret);
+        secretBytes = bs58.decode(envSecret.trim());  // trim whitespace just in case
+        usedMethod = 'base58';
+      } catch (bs58Err) {
+        // Fallback: user might have pasted the raw JSON array from a keypair.json file
+        try {
+          secretBytes = JSON.parse(envSecret.trim());
+          usedMethod = 'json-array';
+        } catch (jsonErr) {
+          // Both failed - give a helpful message
+          console.error('Failed to load treasury from TREASURY_SECRET:');
+          console.error('  - base58 decode failed (probably not a clean base58 string)');
+          console.error('  - JSON.parse failed:', jsonErr.message);
+          console.error('');
+          console.error('Fix: Copy ONLY the raw private key from Phantom (no quotes around it).');
+          console.error('Example correct value: 5xK9vL3pQ... (long string, no " at the start or end)');
+          console.error('Or for a keypair.json file, paste the entire array: [12,34,56,...]');
+          console.error('Do not include any extra spaces, newlines, or quotes.');
+          return; // don't continue
+        }
       }
 
-      if (secretBytes.length === 64) {
+      if (secretBytes && secretBytes.length === 64) {
         treasuryKeypair = Keypair.fromSecretKey(Uint8Array.from(secretBytes));
-        console.log('Loaded treasury from TREASURY_SECRET env var');
+        console.log(`Loaded treasury from TREASURY_SECRET env var (using ${usedMethod})`);
         console.log('Treasury public address:', treasuryKeypair.publicKey.toBase58());
         if (isMainnet) {
           console.log('\n*** MAINNET MODE *** Using private key from environment variable.');
@@ -69,10 +86,11 @@ function loadOrCreateTreasury() {
         }
         return; // success, do not fall through to file generation
       } else {
-        console.error('TREASURY_SECRET was provided but did not decode to 64 bytes.');
+        console.error('TREASURY_SECRET was provided but did not decode to exactly 64 bytes.');
+        console.error('Length was:', secretBytes ? secretBytes.length : 'null');
       }
     } catch (e) {
-      console.error('Failed to load treasury from TREASURY_SECRET:', e.message);
+      console.error('Unexpected error loading TREASURY_SECRET:', e.message);
     }
   }
 
