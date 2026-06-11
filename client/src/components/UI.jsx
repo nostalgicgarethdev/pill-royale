@@ -64,13 +64,24 @@ export const UI = ({ wallet, playerName }) => {
             <div className="mt-3">
               {host ? (
                 <button
-                  className="bg-gradient-to-br from-orange-500 to-yellow-500 hover:opacity-90 px-8 py-2.5 rounded-2xl font-black text-lg text-white"
-                  onClick={startGame}
+                  disabled={!canStartOfficial}
+                  className={`px-8 py-2.5 rounded-2xl font-black text-lg text-white ${canStartOfficial ? 'bg-gradient-to-br from-orange-500 to-yellow-500 hover:opacity-90' : 'bg-gray-600 cursor-not-allowed'}`}
+                  onClick={() => {
+                    if (canStartOfficial) {
+                      // Tell the backend server to start the SINGLE official game (0.1 SOL only)
+                      // This enforces only 1 game at a time on the server
+                      if (window.pillWs && window.pillWs.readyState === 1) {
+                        window.pillWs.send(JSON.stringify({ type: 'request_official_start' }));
+                      }
+                      // Then start the local 3D Playroom session (the host starts it for the room)
+                      startGame();
+                    }
+                  }}
                 >
-                  START GAME
+                  {canStartOfficial ? 'START GAME (0.1 SOL)' : 'WAITING FOR SERVER / MORE PLAYERS'}
                 </button>
               ) : (
-                <p className="text-xs text-white/80">Waiting for host to start...</p>
+                <p className="text-xs text-white/80">Waiting for host to start the single official game...</p>
               )}
             </div>
 
@@ -91,7 +102,7 @@ export const UI = ({ wallet, playerName }) => {
             onClick={handlePayout}
             className="bg-gradient-to-br from-emerald-500 to-green-600 hover:opacity-90 px-10 py-3 rounded-lg font-black text-xl text-white"
           >
-            CLAIM YOUR SOL PRIZE
+            CLAIM 0.1 SOL PRIZE
           </button>
           <p className="text-xs mt-2 text-white/70">Automatic payout to your connected wallet</p>
         </div>

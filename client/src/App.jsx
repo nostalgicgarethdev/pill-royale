@@ -3,7 +3,7 @@ import { Physics } from "@react-three/rapier";
 import { Experience } from "./components/Experience";
 
 import { KeyboardControls } from "@react-three/drei";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { UI } from "./components/UI";
 import { AudioManagerProvider } from "./hooks/useAudioManager";
 import { GameStateProvider } from "./hooks/useGameState";
@@ -21,6 +21,8 @@ export const Controls = {
 function App() {
   const [wallet, setWallet] = useState("");
   const [playerName, setPlayerName] = useState("");
+  const [canStartOfficial, setCanStartOfficial] = useState(false);
+  const [wsMeta, setWsMeta] = useState(null); // backend WS for real player lobby and single game enforcement
 
   const map = useMemo(
     () => [
@@ -33,6 +35,43 @@ function App() {
     []
   );
 
+  // Connect to backend server for real-player lobby, single-game enforcement, and 0.1 SOL payouts
+  useEffect(() => {
+    if (!wallet || !playerName) return;
+
+    const wsUrl = (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + (window.location.host || 'localhost:3000');
+    const ws = new WebSocket(wsUrl);
+
+    ws.onopen = () => {
+      ws.send(JSON.stringify({ type: 'join', name: playerName, wallet }));
+      setWsMeta(ws);
+      window.pillWs = ws; // for UI to request official start (single game enforcement)
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'game_status') {
+          setCanStartOfficial(!!msg.canStartOfficial);
+        }
+        if (msg.type === 'official_game_started') {
+          // Server approved the single official game - now the host can safely start the 3D Playroom session
+          // Non-hosts will sync via Playroomkit since they joined the same room
+          console.log('Official game started by server - only 1 game, 0.1 SOL prize');
+        }
+      } catch (e) {}
+    };
+
+    ws.onclose = () => {
+      setWsMeta(null);
+      setCanStartOfficial(false);
+    };
+
+    return () => {
+      if (ws.readyState === 1) ws.close();
+    };
+  }, [wallet, playerName]);
+
   return (
     <KeyboardControls map={map}>
       <AudioManagerProvider>
@@ -44,7 +83,7 @@ function App() {
                 <Experience wallet={wallet} playerName={playerName} />
               </Physics>
             </Canvas>
-            <UI wallet={wallet} playerName={playerName} />
+            <UI wallet={wallet} playerName={playerName} canStartOfficial={canStartOfficial} />
             
             {/* Simple floating entry - ONLY name + paste wallet address. No Phantom button. */}
             {!wallet && (

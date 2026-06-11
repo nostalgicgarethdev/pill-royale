@@ -17,7 +17,7 @@ const {
 // ==================== CONFIG ====================
 const PORT = process.env.PORT || 3000;
 const CLUSTER = process.env.CLUSTER || 'mainnet-beta'; // 'mainnet-beta' or 'devnet' (mainnet is now default)
-const PRIZE_SOL = parseFloat(process.env.PRIZE_SOL || '0.1');
+const PRIZE_SOL = 0.1; // FIXED: only 0.1 SOL per game, no dynamic or concurrent prizes
 const MAX_TOTAL_PLAYERS = 7;
 const WORLD_SCALE = 0.09; // matches client 3D scale for hexToWorld
 const GRAVITY = -25;
@@ -26,7 +26,7 @@ const ROUND_COUNTDOWN_MS = 6500;
 const TICK_MS = 55;
 const SHRINK_INTERVAL_MS = 16000; // longer rounds - outer rings collapse more slowly
 
-const PRIZE_LAMPORTS = Math.floor(PRIZE_SOL * LAMPORTS_PER_SOL);
+const PRIZE_LAMPORTS = Math.floor(0.1 * LAMPORTS_PER_SOL); // strictly 0.1 SOL only, no more no less
 
 const app = express();
 const server = http.createServer(app);
@@ -584,6 +584,16 @@ function broadcastPlayerCount() {
   broadcast('player_count', { count });
 }
 
+function broadcastGameStatus() {
+  const canStart = !roundInProgress && lobby.length >= MIN_REAL_TO_START;
+  broadcast('game_status', {
+    canStartOfficial: canStart,
+    prize: PRIZE_SOL,
+    activePlayers: lobby.length,
+    roundInProgress
+  });
+}
+
 function getLobbyState() {
   return {
     players: lobby.map(p => ({ name: p.name, walletShort: p.wallet ? p.wallet.slice(0,4)+'..'+p.wallet.slice(-4) : '' })),
@@ -690,6 +700,7 @@ function resetAfterRound() {
   } else {
     broadcast('waiting_for_players', getLobbyState());
   }
+  broadcastGameStatus();
 }
 
 // ==================== WEBSOCKET HANDLING ====================
@@ -712,6 +723,7 @@ wss.on('connection', (ws) => {
     cluster: CLUSTER,
     playerCount: connectedClients.size
   }));
+  broadcastGameStatus(); // tell the new client if a game can start or is active
 
   ws.on('message', async (raw) => {
     let msg;
@@ -733,8 +745,9 @@ wss.on('connection', (ws) => {
 
       // Broadcast updated lobby to everyone
       broadcast('lobby_update', getLobbyState());
+      broadcastGameStatus();
 
-      // Try to start
+      // Try to start (only if not already running - only 1 game at a time)
       if (!roundInProgress) {
         startNewRoundIfPossible();
       } else {
@@ -759,10 +772,18 @@ wss.on('connection', (ws) => {
       }
     }
 
+    // bump_volume disabled - fixed 0.1 SOL prize only, no concurrent games or dynamic prizes
     if (msg.type === 'bump_volume') {
-      // Fun simulation of "more trading = bigger prizes"
-      currentGame ? (currentGame.prizeSOL = Math.min(2.5, (currentGame.prizeSOL || PRIZE_SOL) + 0.03)) : null;
-      broadcast('prize_update', { prize: currentGame ? currentGame.prizeSOL : PRIZE_SOL });
+      // no-op to keep prize strictly 0.1 SOL
+    }
+
+    if (msg.type === 'request_official_start' && !roundInProgress) {
+      // Only allow starting ONE official game at a time (no concurrent)
+      if (lobby.length >= MIN_REAL_TO_START) {
+        startNewRoundIfPossible(); // server creates the single Game instance, sets roundInProgress
+        broadcast('official_game_started', { prize: PRIZE_SOL });
+        broadcastGameStatus();
+      }
     }
   });
 
@@ -772,6 +793,7 @@ wss.on('connection', (ws) => {
     // Remove from lobby
     lobby = lobby.filter(lp => lp.ws !== ws);
     broadcast('lobby_update', getLobbyState());
+    broadcastGameStatus();
     console.log(`[WS] Client disconnected: ${clientId}`);
   });
 });
