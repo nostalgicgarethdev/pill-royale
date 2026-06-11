@@ -323,6 +323,10 @@
         playerObjects = {};
         // Prefer 3D raycast for tile clicks
         canvas.addEventListener('click', onThreeClick);
+        // Force a render to avoid blank canvas
+        setTimeout(() => {
+          if (typeof updateThree === 'function') updateThree();
+        }, 10);
         showToast('Round started — keep moving!');
       }
       if (msg.type === 'state') {
@@ -419,14 +423,8 @@
 
     function setupInput() {
       canvas = document.getElementById('game-canvas');
-      ctx = canvas.getContext('2d', { alpha: true });
-
-      canvas.addEventListener('click', e => {
-        if (!isPlaying) return;
-        const rect = canvas.getBoundingClientRect();
-        const h = pixelToHex(e.clientX - rect.left - canvas.width/2, e.clientY - rect.top - canvas.height/2 - 10);
-        if (isValidHex(h.q, h.r)) sendMove(h);
-      });
+      // No 2D context - using WebGL/Three.js for 3D mode
+      // canvas.addEventListener for click is added dynamically in 3D round_start for raycast
 
       window.addEventListener('keydown', e => {
         if (!isPlaying) return;
@@ -560,16 +558,30 @@
     // ==================== 3D (Three.js) - LOLBeans style ====================
     function setupThree() {
       if (threeReady) return;
-      renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+      // Use existing canvas for WebGL (no prior 2D context)
+      renderer = new THREE.WebGLRenderer({ 
+        canvas: canvas, 
+        antialias: true,
+        alpha: true 
+      });
       renderer.setSize(canvas.width, canvas.height);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setClearColor(0x0a0a0f, 1); // dark bg
+
       scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x0a0a0f);
+
       camera = new THREE.PerspectiveCamera(65, canvas.width / canvas.height, 0.1, 200);
-      // Lights
-      scene.add(new THREE.AmbientLight(0x606060));
-      const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
-      dirLight.position.set(20, 30, 15);
+
+      // Lights for visibility
+      scene.add(new THREE.AmbientLight(0x808080));
+      const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+      dirLight.position.set(15, 25, 10);
       scene.add(dirLight);
+
+      const hemiLight = new THREE.HemisphereLight(0xaaaaee, 0x222233, 0.6);
+      scene.add(hemiLight);
+
       // Ground
       const ground = new THREE.Mesh(
         new THREE.PlaneGeometry(90, 90),
@@ -578,7 +590,11 @@
       ground.rotation.x = -Math.PI / 2;
       ground.position.y = -0.05;
       scene.add(ground);
+
       threeReady = true;
+
+      // Force initial render
+      renderer.render(scene, camera);
     }
 
     function getTileColor3D(state) {
