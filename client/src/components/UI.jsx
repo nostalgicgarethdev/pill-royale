@@ -1,4 +1,4 @@
-import { openDiscordInviteDialog } from "playroomkit";
+import { openDiscordInviteDialog, myPlayer } from "playroomkit";
 import { useAudioManager } from "../hooks/useAudioManager";
 import { useGameState } from "../hooks/useGameState";
 
