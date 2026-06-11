@@ -1,15 +1,20 @@
 {
   "name": "pill-royale",
   "version": "1.0.0",
-  "description": "Last pill standing wins real SOL. Hex battle royale with automatic on-chain payouts.",
+  "description": "Last pill standing wins real SOL. 3D hex crumbling battle royale with automatic on-chain payouts. Based on wawa-guys 3D template.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "node server.js",
+    "client": "cd client && npm run dev",
+    "build:client": "cd client && npm run build",
+    "install:all": "npm install && cd client && npm install"
   },
   "dependencies": {
     "@solana/web3.js": "^1.95.3",
     "bs58": "^6.0.0",
+    "concurrently": "^8.2.2",
     "express": "^4.19.2",
     "ws": "^8.18.0"
   },

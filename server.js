@@ -31,8 +31,12 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-// Serve the game statically
-app.use(express.static(__dirname));
+// Serve the game statically (React build from client/dist for production)
+app.use(express.static(__dirname + '/client/dist'));
+
+// For dev, the Vite client runs separately on its port
+// In production (Railway etc.): npm run build:client then the static serves the React app + this API/WS
+app.use('/assets', express.static(__dirname + '/client/dist/assets'));
 app.use(express.json());
 
 // ==================== SOLANA SETUP ====================
