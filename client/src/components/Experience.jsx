@@ -22,19 +22,47 @@ export const Experience = ({ wallet, playerName }) => {
     }
   }, [stage]);
 
+  // Set a nice camera view for the lobby/pre-game so it's not a black void
+  useEffect(() => {
+    if (stage === "lobby") {
+      // Overview angle showing the full 3D hex arena nicely (not too high, fills the screen)
+      camera.position.set(0, 25, 35);
+      camera.lookAt(0, 5, 0);
+    } else if (stage === "countdown") {
+      camera.position.set(0, 50, -50);
+    }
+  }, [stage]);
+
   return (
     <>
-      {/* Dark background + simple ground for visibility */}
-      <color attach="background" args={["#041c0b"]} />
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position-y={-0.1}>
-        <planeGeometry args={[100, 100]} />
-        <meshLambertMaterial color="#0a2a12" />
+      {/* Vibrant but dark background for the 3D pill arena */}
+      <color attach="background" args={["#0a1f12"]} />
+
+      {/* Soft ground so the hex platforms don't float in void */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position-y={-0.05} receiveShadow>
+        <planeGeometry args={[120, 120]} />
+        <meshLambertMaterial color="#112211" />
       </mesh>
 
-      {/* Always show the crumbling hex arena for the core experience */}
+      {/* Good lighting so the colored hexes actually show up bright instead of black */}
+      <ambientLight intensity={0.6} />
+      <directionalLight 
+        position={[20, 30, 10]} 
+        intensity={1.2} 
+        castShadow 
+        shadow-mapSize-width={1024} 
+        shadow-mapSize-height={1024} 
+      />
+      <hemisphereLight 
+        skyColor="#aaffaa" 
+        groundColor="#112211" 
+        intensity={0.5} 
+      />
+
+      {/* Always show the crumbling hex arena - this is the main visual before/during game */}
       <GameArena />
 
-      {/* Players - the controller makes movement simple and easy */}
+      {/* Real players (pills) moving around the arena */}
       {players.map(({ state, controls }) => (
         <CharacterController
           key={state.id}
@@ -43,13 +71,12 @@ export const Experience = ({ wallet, playerName }) => {
           player={me.id === state.id}
           firstNonDeadPlayer={firstNonDeadPlayer?.state.id === state.id}
           position-y={2}
-          // Pass wallet info for real player display / payout
           wallet={wallet}
           playerName={playerName}
         />
       ))}
 
-      {/* Optional podium on win */}
+      {/* Winner podium when someone wins */}
       {stage === "winner" && <Podium />}
     </>
   );
