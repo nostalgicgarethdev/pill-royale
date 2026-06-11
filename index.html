@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PILL ROYALE — Last Pill Standing</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Space+Grotesk:wght@500;600&amp;display=swap');
     
@@ -178,8 +179,8 @@
             </div>
             <div class="absolute top-4 right-4 bg-black/70 backdrop-blur px-3 py-2 rounded-2xl text-xs border border-white/10 font-mono" id="game-timer">00:00</div>
             <div class="absolute bottom-4 left-4 bg-black/70 backdrop-blur px-3 py-2 rounded-2xl text-xs border border-white/10">
-              <div class="text-[10px] text-emerald-400/80 mb-px">CONTROLS</div>
-              <div class="text-[10px] text-zinc-400 leading-tight">WASD / Arrows or click adjacent tiles<br>Keep moving — tiles fall under you.</div>
+              <div class="text-[10px] text-emerald-400/80 mb-px">CONTROLS (3D)</div>
+              <div class="text-[10px] text-zinc-400 leading-tight">WASD / Arrows or click tiles<br>Space to jump • Keep moving — tiles fall!</div>
             </div>
           </div>
 
@@ -233,6 +234,12 @@
     let isPlaying = false;
     let gameEnded = false;
     let particles = [];
+
+    // 3D
+    let scene, camera, renderer;
+    let tileObjects = {};
+    let playerObjects = {};
+    let threeReady = false;
 
     const HEX_SIZE = 36;
     const GRID_RADIUS = 5;
@@ -311,6 +318,11 @@
         renderPrize = msg.prize || 0.1;
         updatePrizeDisplay();
         updateIngamePlayerList();
+        setupThree();
+        tileObjects = {};
+        playerObjects = {};
+        // Prefer 3D raycast for tile clicks
+        canvas.addEventListener('click', onThreeClick);
         showToast('Round started — keep moving!');
       }
       if (msg.type === 'state') {
@@ -545,7 +557,173 @@
       ctx.restore();
     }
 
-    function gameLoop() { render(); updateTimer(); requestAnimationFrame(gameLoop); }
+    // ==================== 3D (Three.js) - LOLBeans style ====================
+    function setupThree() {
+      if (threeReady) return;
+      renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+      renderer.setSize(canvas.width, canvas.height);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(65, canvas.width / canvas.height, 0.1, 200);
+      // Lights
+      scene.add(new THREE.AmbientLight(0x606060));
+      const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
+      dirLight.position.set(20, 30, 15);
+      scene.add(dirLight);
+      // Ground
+      const ground = new THREE.Mesh(
+        new THREE.PlaneGeometry(90, 90),
+        new THREE.MeshLambertMaterial({ color: 0x111122 })
+      );
+      ground.rotation.x = -Math.PI / 2;
+      ground.position.y = -0.05;
+      scene.add(ground);
+      threeReady = true;
+    }
+
+    function getTileColor3D(state) {
+      if (state.fallen) return 0x0a0a0f;
+      if (state.fallAt) return 0x8B5A2B;
+      if (state.durability <= 1) return 0x3a2a1a;
+      if (state.durability <= 2) return 0x2a2a3a;
+      return 0x3a3a4a;
+    }
+
+    function createTileMesh3D(q, r, state) {
+      const size = 1.8;
+      const geo = new THREE.CylinderGeometry(size, size, 0.35, 6);
+      const mat = new THREE.MeshLambertMaterial({ color: getTileColor3D(state) });
+      const mesh = new THREE.Mesh(geo, mat);
+      const pos2d = hexToPixel(q, r);
+      mesh.position.x = pos2d.x * 0.09;
+      mesh.position.z = pos2d.y * 0.09;
+      mesh.position.y = 0.18;
+      mesh.userData = { q, r };
+      scene.add(mesh);
+      return mesh;
+    }
+
+    function createPlayerMesh3D(p) {
+      const group = new THREE.Group();
+      const color = p.color || 0x22ff88;
+      // Pill body (capsule)
+      const body = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.55, 0.55, 1.4, 8),
+        new THREE.MeshLambertMaterial({ color })
+      );
+      body.position.y = 0.7;
+      group.add(body);
+      const capTop = new THREE.Mesh(
+        new THREE.SphereGeometry(0.55, 8, 8),
+        new THREE.MeshLambertMaterial({ color })
+      );
+      capTop.position.y = 1.4;
+      group.add(capTop);
+      const capBot = capTop.clone();
+      capBot.position.y = 0;
+      group.add(capBot);
+      // Highlight ring for you
+      const isMe = p.id === 'human' || (p.walletShort && userWallet && p.walletShort.includes(userWallet.slice(0,4)));
+      if (isMe) {
+        const ring = new THREE.Mesh(
+          new THREE.TorusGeometry(0.85, 0.06, 6, 16),
+          new THREE.MeshLambertMaterial({ color: 0x00ff88 })
+        );
+        ring.rotation.x = Math.PI / 2;
+        ring.position.y = 0.1;
+        group.add(ring);
+      }
+      const pos2d = hexToPixel(p.q, p.r);
+      group.position.x = pos2d.x * 0.09;
+      group.position.z = pos2d.y * 0.09;
+      group.position.y = 1.0;
+      scene.add(group);
+      return group;
+    }
+
+    function updateThree() {
+      if (!threeReady || !renderer || !scene || !camera) return;
+      // Tiles
+      const allHexes = getAllHexes();
+      for (const h of allHexes) {
+        const key = hexKey(h.q, h.r);
+        const state = renderTiles.get(key) || { durability: 3, fallen: false, fallAt: null };
+        if (!tileObjects[key]) {
+          tileObjects[key] = createTileMesh3D(h.q, h.r, state);
+        }
+        const m = tileObjects[key];
+        m.material.color.setHex(getTileColor3D(state));
+        if (state.fallen) {
+          m.position.y = -4;
+        } else if (state.fallAt) {
+          const t = Math.max(0, (Date.now() - state.fallAt) / 900);
+          m.position.y = 0.18 - t * 2.5;
+        } else {
+          m.position.y = 0.18;
+        }
+      }
+      // Players
+      for (const p of renderPlayers) {
+        const key = p.id;
+        if (!playerObjects[key]) {
+          playerObjects[key] = createPlayerMesh3D(p);
+        }
+        const obj = playerObjects[key];
+        const pos2d = hexToPixel(p.q, p.r);
+        obj.position.x = pos2d.x * 0.09;
+        obj.position.z = pos2d.y * 0.09;
+        // Sink with tile
+        const ts = renderTiles.get(hexKey(p.q, p.r)) || {};
+        if (p.eliminated || ts.fallen) {
+          obj.position.y = -2.5;
+        } else if (ts.fallAt) {
+          const t = Math.max(0, (Date.now() - ts.fallAt) / 900);
+          obj.position.y = 1.0 - t * 2.5;
+        } else {
+          obj.position.y = 1.0;
+        }
+      }
+      // Camera follow (simple third-person like)
+      const me = renderPlayers.find(pp => pp.id === 'human' || (pp.walletShort && userWallet && pp.walletShort.includes(userWallet.slice(0,4))));
+      if (me) {
+        const p2 = hexToPixel(me.q, me.r);
+        const wx = p2.x * 0.09;
+        const wz = p2.y * 0.09;
+        camera.position.x = wx + 12;
+        camera.position.z = wz + 18;
+        camera.position.y = 16;
+        camera.lookAt(wx, 3, wz);
+      } else {
+        camera.position.set(0, 22, 28);
+        camera.lookAt(0, 1, 0);
+      }
+      renderer.render(scene, camera);
+    }
+
+    function onThreeClick(e) {
+      if (!isPlaying || !renderer || !camera || !scene) return;
+      const rect = canvas.getBoundingClientRect();
+      const mouse = new THREE.Vector2();
+      mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      const ray = new THREE.Raycaster();
+      ray.setFromCamera(mouse, camera);
+      const hits = ray.intersectObjects(Object.values(tileObjects));
+      if (hits.length > 0) {
+        const m = hits[0].object;
+        const q = m.userData.q;
+        const r = m.userData.r;
+        if (isValidHex(q, r)) {
+          sendMove({ q, r });
+        }
+      }
+    }
+
+    function gameLoop() {
+      updateThree();
+      updateTimer();
+      requestAnimationFrame(gameLoop);
+    }
     function showToast(t) {
       const c = document.getElementById('game-screen'); if (!c) return;
       const el = document.createElement('div');
