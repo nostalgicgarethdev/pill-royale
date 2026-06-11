@@ -28,21 +28,25 @@ export const FLOORS = [
   },
 ];
 
-export const GameArena = () => {
+export const GameArena = ({ static: isStatic = false }) => {
   const [hexagonHit, setHexagonHit] = useState({});
-  RPC.register("hexagonHit", (data) => {
-    setHexagonHit((prev) => ({
-      ...prev,
-      [data.hexagonKey]: true,
-    }));
-  });
+
+  // Only wire up Playroom RPC when the real game is running (not in static lobby preview)
+  if (!isStatic) {
+    RPC.register("hexagonHit", (data) => {
+      setHexagonHit((prev) => ({
+        ...prev,
+        [data.hexagonKey]: true,
+      }));
+    });
+  }
 
   return (
     <group
       position-x={-((NB_COLUMNS - 1) / 2) * HEX_X_SPACING}
       position-z={-((NB_ROWS - 1) / 2) * HEX_Z_SPACING}
     >
-      {/* HEXAGONS - crumbling platforms for last pill standing */}
+      {/* HEXAGONS */}
       {FLOORS.map((floor, floorIndex) => (
         <group key={floorIndex} position-y={floorIndex * -FLOOR_HEIGHT}>
           {[...Array(NB_ROWS)].map((_, rowIndex) => (
@@ -51,22 +55,39 @@ export const GameArena = () => {
               position-z={rowIndex * HEX_Z_SPACING}
               position-x={rowIndex % 2 ? HEX_X_SPACING / 2 : 0}
             >
-              {[...Array(NB_COLUMNS)].map((_, columnIndex) => (
-                <Hexagon
-                  key={columnIndex}
-                  position-x={columnIndex * HEX_X_SPACING}
-                  color={floor.color}
-                  onHit={() => {
-                    const hexagonKey = `${floorIndex}-${rowIndex}-${columnIndex}`;
-                    setHexagonHit((prev) => ({
-                      ...prev,
-                      [hexagonKey]: true,
-                    }));
-                    RPC.call("hexagonHit", { hexagonKey }, RPC.Mode.ALL);
-                  }}
-                  hit={hexagonHit[`${floorIndex}-${rowIndex}-${columnIndex}`]}
-                />
-              ))}
+              {[...Array(NB_COLUMNS)].map((_, columnIndex) => {
+                const hexagonKey = `${floorIndex}-${rowIndex}-${columnIndex}`;
+                const isHit = hexagonHit[hexagonKey];
+
+                if (isStatic) {
+                  // Static preview mode (lobby / before game starts):
+                  // Simple visible colored hex platforms, no physics, no RPC, no hit logic.
+                  // This prevents crashes from Playroomkit not being ready and gives a nice visible 3D arena.
+                  return (
+                    <mesh key={columnIndex} position-x={columnIndex * HEX_X_SPACING}>
+                      <cylinderGeometry args={[1.1, 1.1, 0.4, 6]} />
+                      <meshStandardMaterial color={floor.color} />
+                    </mesh>
+                  );
+                }
+
+                // Full interactive mode (after game starts)
+                return (
+                  <Hexagon
+                    key={columnIndex}
+                    position-x={columnIndex * HEX_X_SPACING}
+                    color={floor.color}
+                    onHit={() => {
+                      setHexagonHit((prev) => ({
+                        ...prev,
+                        [hexagonKey]: true,
+                      }));
+                      RPC.call("hexagonHit", { hexagonKey }, RPC.Mode.ALL);
+                    }}
+                    hit={isHit}
+                  />
+                );
+              })}
             </group>
           ))}
         </group>

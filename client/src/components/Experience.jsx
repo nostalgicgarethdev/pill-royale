@@ -65,8 +65,12 @@ export const Experience = ({ wallet, playerName }) => {
         intensity={0.5} 
       />
 
-      {/* Always show the crumbling hex arena - this is the main visual before/during game */}
-      <GameArena />
+      {/* The hex arena is always rendered.
+          In lobby (before game starts / while entering name+wallet), pass static=true
+          so we get a safe, visible, non-physics preview (no RPC, no RigidBody).
+          This prevents the white screen crash on initial render or right after clicking Enter.
+          Once the game actually starts (stage changes), it becomes the full interactive crumbling version. */}
+      <GameArena static={isLobby} />
 
       {/* Only render real players (pills) + controllers AFTER lobby (i.e. game has started) */}
       {/* This prevents white screen / crashes during initial render, wallet entry, or lobby phase */}
