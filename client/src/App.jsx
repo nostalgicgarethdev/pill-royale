@@ -8,23 +8,7 @@ import { UI } from "./components/UI";
 import { AudioManagerProvider } from "./hooks/useAudioManager";
 import { GameStateProvider } from "./hooks/useGameState";
 
-// Solana wallet connect (Phantom) for real players + SOL payouts
-// Name comes from the form input above
-async function connectWallet(setWallet, nameToUse) {
-  if (window.solana && window.solana.isPhantom) {
-    try {
-      const resp = await window.solana.connect();
-      const addr = resp.publicKey.toString();
-      setWallet(addr);
-      console.log("Wallet connected for real SOL:", addr);
-      // The name is already set from the input in the onClick
-    } catch (err) {
-      alert("Phantom connection failed or was cancelled. You can still paste the address using the button below.");
-    }
-  } else {
-    alert("Phantom wallet not detected. Use the 'Paste Address' button instead, or install Phantom extension.");
-  }
-}
+// Wallet is now only via direct paste (no Phantom button as requested)
 
 export const Controls = {
   forward: "forward",
@@ -62,56 +46,51 @@ function App() {
             </Canvas>
             <UI wallet={wallet} playerName={playerName} />
             
-            {/* Floating wallet entry - minimal overlay so you see the 3D arena immediately */}
+            {/* Simple floating entry - ONLY name + paste wallet address. No Phantom button. */}
             {!wallet && (
-              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[60] pointer-events-auto w-[94vw] max-w-[380px]">
-                <div className="bg-zinc-950/95 border border-zinc-700 rounded-3xl p-5 text-white shadow-xl">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="text-2xl">💊</div>
-                    <div>
-                      <div className="font-semibold text-lg leading-none">PILL ROYALE</div>
-                      <div className="text-emerald-400 text-xs">Real SOL • 3D • Real players only</div>
-                    </div>
+              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[60] pointer-events-auto w-[94vw] max-w-[360px]">
+                <div className="bg-zinc-950/95 border border-zinc-700 rounded-3xl p-4 text-white shadow-xl">
+                  <div className="text-center mb-3">
+                    <div className="text-2xl mb-1">💊</div>
+                    <div className="font-semibold text-lg">PILL ROYALE</div>
+                    <div className="text-emerald-400 text-xs">Real SOL • 3D • Real players only</div>
                   </div>
 
-                  <div className="space-y-2.5">
+                  <div className="space-y-2">
                     <input 
                       type="text" 
                       id="player-name-input"
                       defaultValue="PillPlayer"
                       placeholder="Your display name"
-                      className="w-full bg-zinc-900 border border-zinc-800 focus:border-emerald-500 rounded-2xl px-4 py-2 text-sm outline-none"
+                      className="w-full bg-zinc-900 border border-zinc-800 focus:border-emerald-500 rounded-2xl px-3 py-2 text-sm outline-none"
                     />
 
-                    <div className="flex gap-2">
-                      <button 
-                        onClick={() => {
-                          const nameInput = document.getElementById('player-name-input').value.trim() || 'PillPlayer';
-                          setPlayerName(nameInput);
-                          connectWallet(setWallet, nameInput);
-                        }}
-                        className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-black font-semibold py-2 rounded-2xl text-sm transition"
-                      >
-                        Connect Phantom
-                      </button>
-                      <button 
-                        onClick={() => {
-                          const nameInput = document.getElementById('player-name-input').value.trim() || 'PillPlayer';
-                          const addr = prompt('Paste Solana wallet for payout:');
-                          if (addr) {
-                            setWallet(addr);
-                            setPlayerName(nameInput);
-                          }
-                        }}
-                        className="px-3 py-2 text-xs border border-zinc-700 hover:bg-zinc-900 rounded-2xl"
-                      >
-                        Paste Addr
-                      </button>
-                    </div>
+                    <input 
+                      type="text" 
+                      id="wallet-address-input"
+                      placeholder="Paste your Solana wallet address here"
+                      className="w-full bg-zinc-900 border border-zinc-800 focus:border-emerald-500 rounded-2xl px-3 py-2 text-xs font-mono outline-none"
+                    />
+
+                    <button 
+                      onClick={() => {
+                        const nameInput = document.getElementById('player-name-input').value.trim() || 'PillPlayer';
+                        const addrInput = document.getElementById('wallet-address-input').value.trim();
+                        if (!addrInput) {
+                          alert('Please paste your Solana wallet address to join for real SOL.');
+                          return;
+                        }
+                        setPlayerName(nameInput);
+                        setWallet(addrInput);
+                      }}
+                      className="w-full bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-black font-semibold py-2.5 rounded-2xl text-sm transition"
+                    >
+                      Enter with Wallet (Real SOL)
+                    </button>
                   </div>
 
-                  <div className="text-[10px] text-center text-zinc-500 mt-2">
-                    Connect once • Payouts automatic to your wallet if you win
+                  <div className="text-[9px] text-center text-zinc-500 mt-2 leading-tight">
+                    Paste address once • Automatic payout to this wallet if you win • No gas to play
                   </div>
                 </div>
               </div>

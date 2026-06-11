@@ -58,7 +58,7 @@ export const UI = ({ wallet, playerName }) => {
         <div className="pointer-events-auto absolute bottom-6 left-1/2 -translate-x-1/2 w-[94vw] max-w-[380px]">
           <div className="bg-zinc-950/95 border border-zinc-700 rounded-3xl p-4 text-center text-white shadow-xl">
             <p className="text-base font-semibold">Lobby open — take your time!</p>
-            <p className="text-emerald-300 text-xs mt-1 leading-tight">Connect wallet (bottom if not done) • Min 2 real players needed • Host starts the round when ready</p>
+            <p className="text-emerald-300 text-xs mt-1 leading-tight">Enter name + paste wallet at bottom • Min 2 real players needed • Host starts when ready</p>
             <p className="text-white/60 text-[10px] mt-1">The 3D arena is live below. No rush — plenty of time before the game begins.</p>
 
             <div className="mt-3">
