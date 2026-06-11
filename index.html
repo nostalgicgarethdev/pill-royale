@@ -60,8 +60,9 @@
             <div class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
             <span class="text-emerald-400 font-medium" id="live-players">0 playing</span>
           </div>
-          <div class="hidden md:flex items-center gap-x-1.5 text-xs px-3 py-1 rounded-full bg-zinc-900 border border-zinc-800 cursor-pointer" id="volume-display" title="Click to simulate trading volume (grows prize)">
-            $482.9k
+          <div class="hidden md:flex items-center gap-x-1.5 text-xs px-3 py-1 rounded-full bg-zinc-900 border border-zinc-800 cursor-pointer" id="ca-display" title="Click to copy token contract address">
+            <span class="text-zinc-500">CA</span>
+            <span id="ca-value" class="font-mono">Coming soon</span>
           </div>
         </div>
       </div>
@@ -587,8 +588,32 @@
       document.getElementById('player-name').addEventListener('keydown', e => { if (e.key==='Enter') joinGame(); });
       requestAnimationFrame(gameLoop);
 
-      const vol = document.getElementById('volume-display');
-      if (vol) vol.onclick = () => { if (ws && ws.readyState===1) ws.send(JSON.stringify({type:'bump_volume'})); };
+      // Token CA display (will be replaced with real CA when coin launches)
+      const caDisplay = document.getElementById('ca-display');
+      const caValue = document.getElementById('ca-value');
+
+      // TODO: Replace with your actual token contract address when launched
+      const TOKEN_CA = ""; // e.g. "YourBase58ContractAddressHere"
+
+      if (caDisplay && caValue) {
+        if (TOKEN_CA) {
+          const shortCA = TOKEN_CA.slice(0, 4) + ".." + TOKEN_CA.slice(-4);
+          caValue.textContent = shortCA;
+          caDisplay.onclick = () => {
+            navigator.clipboard.writeText(TOKEN_CA).then(() => {
+              const originalText = caValue.textContent;
+              caValue.textContent = "Copied!";
+              setTimeout(() => {
+                caValue.textContent = originalText;
+              }, 1200);
+            });
+          };
+        } else {
+          caDisplay.onclick = () => {
+            alert("Token CA will be added here when the coin launches.");
+          };
+        }
+      }
 
       // connection status pill
       const hdr = document.querySelector('.sticky .flex.items-center.gap-x-6');
