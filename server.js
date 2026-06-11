@@ -20,6 +20,7 @@ const CLUSTER = process.env.CLUSTER || 'mainnet-beta'; // 'mainnet-beta' or 'dev
 const PRIZE_SOL = parseFloat(process.env.PRIZE_SOL || '0.1');
 const MAX_TOTAL_PLAYERS = 7;
 const WORLD_SCALE = 0.09; // matches client 3D scale for hexToWorld
+const GRAVITY = -25;
 const MIN_REAL_TO_START = 2; // only real players - no demo bots at all
 const ROUND_COUNTDOWN_MS = 6500;
 const TICK_MS = 55;
@@ -434,62 +435,7 @@ class Game {
     });
   }
 
-  canMoveTo(p, q, r) {
-    if (!isValidHex(q, r)) return false;
-    const t = this.getTile(q, r);
-    if (t.fallen) return false;
-    const now = Date.now();
-    if (t.fallAt && now + 160 > t.fallAt) return false;
-
-    for (const other of this.players) {
-      if (other !== p && !other.eliminated && other.q === q && other.r === r) return false;
-    }
-    return true;
-  }
-
-  movePlayer(p, targetQ, targetR) {
-    if (p.eliminated) return false;
-    if (!this.canMoveTo(p, targetQ, targetR)) return false;
-
-    const oldQ = p.q, oldR = p.r;
-    p.q = targetQ;
-    p.r = targetR;
-    p.lastMoved = Date.now();
-
-    this.damageTile(targetQ, targetR, 1);
-
-    if (Math.random() < 0.32) this.damageTile(oldQ, oldR, 0.55);
-
-    // no bot logic anymore - only real players
-
-    return true;
-  }
-
-  applyHumanMove(playerId, directionIndex) {
-    const p = this.players.find(pl => pl.id === playerId);
-    if (!p || p.eliminated) return false;
-
-    const now = Date.now();
-    if (now < p.moveCooldownUntil) return false;
-
-    const [dq, dr] = HEX_DIRS[directionIndex % 6];
-    const tq = p.q + dq;
-    const tr = p.r + dr;
-
-    if (this.movePlayer(p, tq, tr)) {
-      p.moveCooldownUntil = now + this.MOVE_COOLDOWN;
-      return true;
-    }
-    return false;
-  }
-
-  applyHumanTargetMove(playerId, q, r) {
-    const p = this.players.find(pl => pl.id === playerId);
-    if (!p || p.eliminated) return false;
-    const now = Date.now();
-    if (now < p.moveCooldownUntil) return false;
-
-    // Continuous position update from client (simple & easy to play)
+  // Continuous position update from client (simple & easy to play, like lolbeans)
   updatePlayerPosition(pid, wx, wy, wz) {
     const p = this.players.find(pl => pl.id === pid);
     if (!p || p.eliminated) return;
@@ -797,22 +743,7 @@ wss.on('connection', (ws) => {
     }
 
     if (msg.type === 'move' && currentGame && roundInProgress) {
-      // Legacy discrete support (can be removed later)
-      const player = currentGame.players.find(p => p.wsId === c.id);
-      if (player && !player.eliminated) {
-        let moved = false;
-        if (typeof msg.dir === 'number') {
-          // ignore for continuous mode
-        } else if (msg.q !== undefined && msg.r !== undefined) {
-          // convert to world for simplicity
-          const w = hexToWorld(msg.q, msg.r);
-          currentGame.updatePlayerPosition(player.id, w.x, 1.0, w.z);
-          moved = true;
-        }
-        if (moved) {
-          broadcast('state', currentGame.getPublicState());
-        }
-      }
+      // Legacy discrete support (ignore in continuous 3D mode)
     }
 
     if (msg.type === 'pos' && currentGame && roundInProgress) {
