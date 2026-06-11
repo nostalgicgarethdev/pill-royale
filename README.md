@@ -4,6 +4,8 @@
 
 Fully working server + browser client with **authoritative simulation** and **real Solana transfers** on **mainnet-beta**.
 
+**Latest:** Only real players (no demo bots). Live "X playing" counter shows actual connected real users.
+
 Deploy it as a public website in minutes (Railway / Render) so anyone can join and play for real money from your treasury wallet.
 
 The included configs (`Procfile`, `render.yaml`, `railway.json`) + relative WebSocket code make deployment trivial.
